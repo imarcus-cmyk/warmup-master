@@ -14,6 +14,7 @@
     "warmup:instagram": "node src/orchestrator.js instagram",
     "warmup:daily": "node scripts/dailyScheduler.js",
     "slack:agent": "node src/agent/slackApp.js",
+    "task": "node src/agent/worker.js",
     "check:unclassified": "node src/orchestrator.js --check-unclassified",
     "validate": "node src/orchestrator.js --validate",
     "deploy": "bash scripts/deploy.sh"

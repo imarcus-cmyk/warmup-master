@@ -325,9 +325,10 @@ function overview(results) {
 
 export function looksLikeActionRequest(text) {
   const value = norm(text);
-  return /\b(use|make|have|tell|ask|run|start|open|visit|watch|like|follow|subscribe|browse)\b/.test(value)
-    && /\b(watch|video|videos|shorts|reels|visit|open|like|follow|subscribe|browse|profile|warmup|warm)\b/.test(value)
-    && !/\b(status|history|how did|how is|last|failed|blocked|report|logs?)\b/.test(value);
+  const verb = /\b(use|make|have|tell|ask|run|start|open|go to|visit|watch|like|follow|subscribe|browse|upvote|join|read|scroll|search|bookmark|view)\b/.test(value);
+  const object = /\b(watch|video|videos|short|shorts|reel|reels|visit|open|like|likes|follow|follows|subscribe|channel|browse|upvote|join|sub|subreddit|post|posts|tweet|story|stories|profile|account|warmup|warm)\b/.test(value);
+  const readOnly = /\b(status|history|how did|how is|how are|last \d|failed|blocked|report|logs?|doing\??$)\b/.test(value);
+  return verb && object && !readOnly;
 }
 
 export function helpText() {
@@ -339,7 +340,8 @@ export function helpText() {
     '• `which profiles failed recently?`',
     '• `status of youtube profiles`',
     '',
-    'One-off browser actions will be added behind confirmation buttons and profile locks next.',
+    '*One-off actions* (TikTok live; runs immediately, per-profile locked):',
+    '• `use Tiktok June 9 to go to @someaccount, watch 2 videos, follow 2 channels, like 1 video`',
   ].join('\n');
 }
 

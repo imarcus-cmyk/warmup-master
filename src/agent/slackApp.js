@@ -6,6 +6,7 @@ import {
   helpText,
   looksLikeActionRequest,
 } from './history.js';
+import { runActionRequest } from './worker.js';
 
 const {
   SLACK_BOT_TOKEN,
@@ -41,10 +42,11 @@ async function postInChannel(client, event, text) {
 
 async function answerText(text) {
   if (looksLikeActionRequest(text)) {
-    return [
-      'I understand this as a one-off browser action request.',
-      'Action execution is not enabled in this first agent pass yet. The next piece should add confirmation buttons, per-profile locks, and a queued one-off runner before anything opens a GoLogin profile from Slack.',
-    ].join('\n');
+    // Delegate to the "Warmup social profiles" worker: it resolves the named
+    // actor profile, opens the GoLogin browser, runs the targeted actions, and
+    // returns a summary the manager posts back here.
+    const { message } = await runActionRequest(text);
+    return message;
   }
   return answerWarmupQuestion(text);
 }
@@ -53,6 +55,9 @@ app.event('app_mention', async ({ event, client, logger }) => {
   try {
     if (event.channel !== SLACK_AGENT_CHANNEL_ID) return;
     const text = stripMention(event.text);
+    if (looksLikeActionRequest(text)) {
+      await postInChannel(client, event, ':hourglass_flowing_sand: On it — handing this to Warmup social profiles…');
+    }
     await postInChannel(client, event, await answerText(text));
   } catch (err) {
     logger.error(err);
@@ -73,6 +78,13 @@ app.command('/warmup', async ({ ack, command, client, logger }) => {
     }
 
     const text = command.text?.trim();
+    if (text && looksLikeActionRequest(text)) {
+      await client.chat.postMessage({
+        channel: command.channel_id,
+        text: ':hourglass_flowing_sand: On it — handing this to Warmup social profiles…',
+        unfurl_links: false,
+      });
+    }
     const answer = text ? await answerText(text) : helpText();
     await client.chat.postMessage({
       channel: command.channel_id,
