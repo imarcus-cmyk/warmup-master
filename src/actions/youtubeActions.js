@@ -23,11 +23,47 @@ async function clickActiveShortControl(page, names, blocked = []) {
       const style = window.getComputedStyle(el);
       return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
     };
-    const textFor = el => `${el.textContent || ''} ${el.getAttribute('aria-label') || ''}`.trim();
+    const textFor = el => [
+      el.textContent || '',
+      el.getAttribute('aria-label') || '',
+      el.getAttribute('title') || '',
+      el.getAttribute('id') || '',
+      el.getAttribute('class') || '',
+    ].join(' ').trim();
+    const click = el => {
+      const button = el.matches('button, [role="button"]') ? el : el.querySelector('button, [role="button"]');
+      const target = button || el;
+      if (!visible(target)) return false;
+      target.scrollIntoView({ block: 'center' });
+      target.click();
+      return true;
+    };
+    const wantsLike = names.some(name => /^like$/i.test(name));
+    const wantsDislike = names.some(name => /^dislike$/i.test(name));
+    const wantsComment = names.some(name => /^comments?$/i.test(name));
     const active = document.querySelector('ytd-reel-video-renderer[is-active]')
       || document.querySelector('#shorts-player')
       || document;
-    const buttons = [...active.querySelectorAll('button, yt-button-shape button, [role="button"]')];
+    const roots = active === document ? [document] : [active, document];
+
+    const directSelectors = [];
+    if (wantsLike) directSelectors.push('#like-button button', '#like-button [role="button"]', 'button[aria-label*="like this video" i]');
+    if (wantsDislike) directSelectors.push('#dislike-button button', '#dislike-button [role="button"]', 'button[aria-label*="dislike this video" i]');
+    if (wantsComment) directSelectors.push('#comments-button button', '#comments-button [role="button"]', 'button[aria-label*="comment" i]');
+
+    for (const root of roots) {
+      for (const selector of directSelectors) {
+        for (const el of root.querySelectorAll(selector)) {
+          const text = textFor(el);
+          if (blocked.some(name => new RegExp(`\\b${name}\\b`, 'i').test(text))) continue;
+          if (click(el)) return true;
+        }
+      }
+    }
+
+    const buttons = roots
+      .flatMap(root => [...root.querySelectorAll('button, yt-button-shape button, [role="button"]')])
+      .filter((button, index, all) => all.indexOf(button) === index);
     const control = buttons.find(button => {
       if (!visible(button)) return false;
       const text = textFor(button);
@@ -35,9 +71,7 @@ async function clickActiveShortControl(page, names, blocked = []) {
         && !blocked.some(name => new RegExp(`\\b${name}\\b`, 'i').test(text));
     });
     if (!control) return false;
-    control.scrollIntoView({ block: 'center' });
-    control.click();
-    return true;
+    return click(control);
   }, { names, blocked }).catch(() => false);
 }
 
