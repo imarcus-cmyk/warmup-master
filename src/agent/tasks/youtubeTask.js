@@ -10,8 +10,9 @@ export async function runYouTubeTask(page, task) {
   const likeN = c.like || 0;
   const dislikeN = c.dislike || 0;
   const subN = c.subscribe || c.follow || 0;
-  // enough shorts to actually reach the like/subscribe quotas (helper is probabilistic)
-  const shortsN = Math.max(c.watch || 0, (likeN + dislikeN + subN) * 3, likeN || dislikeN || subN ? 4 : 0);
+  // One-off Slack commands are direct quotas: watch exactly enough Shorts to
+  // have a playing Short for every requested engagement, without padding.
+  const shortsN = Math.max(c.watch || 0, likeN, dislikeN, subN);
   const add = (r, ...keys) => { for (const k of keys) if (r[k]) metrics[k] = (metrics[k] || 0) + r[k]; events.push(...r.events); };
 
   if (c.notifications > 0) add(await YT.notifications(page, { _deadlineAt: task._deadlineAt }), 'notificationsOpened');
@@ -23,9 +24,13 @@ export async function runYouTubeTask(page, task) {
       likeOnShorts: likeN,
       dislikeOnShorts: dislikeN,
       subscribeOnShorts: subN,
+      strictQuotas: true,
       _deadlineAt: task._deadlineAt,
     });
     add(r, 'shorts', 'likes', 'dislikes', 'subscribes');
+    if ((metrics.likes || 0) < likeN) notes.push(`liked ${metrics.likes || 0}/${likeN}`);
+    if ((metrics.dislikes || 0) < dislikeN) notes.push(`disliked ${metrics.dislikes || 0}/${dislikeN}`);
+    if ((metrics.subscribes || 0) < subN) notes.push(`subscribed ${metrics.subscribes || 0}/${subN}`);
   }
   if (c.comment > 0) {
     add(await YT.comment(page, { comment: c.comment, _deadlineAt: task._deadlineAt }), 'comments');

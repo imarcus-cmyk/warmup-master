@@ -68,8 +68,9 @@ export function extractTargets(text) {
 }
 
 export function parseCounts(text) {
+  const watch = countFor(text, ['watch']);
   return {
-    watch: countFor(text, ['watch']),
+    watch: watch + (watch > 0 && /\bwatch(?:es|ed|ing)?\b[\s\S]{0,80}\banother\s+(?:short|video|reel)\b/i.test(text) ? 1 : 0),
     like: countFor(text, ['like']),
     dislike: countFor(text, ['dislike']),
     follow: countFor(text, ['follow']),

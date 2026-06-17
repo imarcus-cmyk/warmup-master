@@ -123,6 +123,7 @@ export async function shorts(page, plan) {
   const likeQuota = plan.likeOnShorts || 0;
   const dislikeQuota = plan.dislikeOnShorts || 0;
   const subQuota = plan.subscribeOnShorts || 0;
+  const strictQuotas = !!plan.strictQuotas;
   try { await page.goto('https://www.youtube.com/shorts', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
   await dismiss(page);
   for (let i = 0; i < plan.shorts; i++) {
@@ -130,17 +131,22 @@ export async function shorts(page, plan) {
     await sleep(rand(5000, 20000)); // watch the current short
 
     // like some shorts, spread out (probabilistic so it's not the first N)
-    if (likes < likeQuota && Math.random() < 0.5) {
-      const ok = await clickActiveShortControl(page, ['like'], ['dislike', 'unlike']);
-      if (ok) { likes++; events.push(makeEvent('like', { onShort: i })); await sleep(rand(1500, 4000)); }
+    const didLike = likes < likeQuota && (strictQuotas || Math.random() < 0.5)
+      ? await clickActiveShortControl(page, ['like'], ['dislike', 'unlike'])
+      : false;
+    if (didLike) {
+      likes++;
+      events.push(makeEvent('like', { onShort: i }));
+      await sleep(rand(1500, 4000));
     }
     // dislike stays opt-in for one-off tasks; daily warmup does not request it.
-    if (dislikes < dislikeQuota && Math.random() < 0.5) {
+    const canDislikeThisShort = !strictQuotas || !didLike;
+    if (canDislikeThisShort && dislikes < dislikeQuota && (strictQuotas || Math.random() < 0.5)) {
       const ok = await clickActiveShortControl(page, ['dislike'], ['remove']);
       if (ok) { dislikes++; events.push(makeEvent('dislike', { onShort: i })); await sleep(rand(1500, 4000)); }
     }
     // subscribe rarely
-    if (subscribes < subQuota && Math.random() < 0.3) {
+    if (subscribes < subQuota && (strictQuotas || Math.random() < 0.3)) {
       const ok = await clickActiveShortSubscribe(page);
       if (ok) { subscribes++; events.push(makeEvent('subscribe', { onShort: i })); await sleep(rand(1500, 4000)); }
     }
