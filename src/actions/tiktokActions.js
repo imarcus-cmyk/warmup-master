@@ -53,6 +53,84 @@ function clickTikTokFollowButton() {
   return true;
 }
 
+function clickFypAvatarPlusByGeometry() {
+  const visible = el => {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    return style.display !== 'none'
+      && style.visibility !== 'hidden'
+      && rect.width > 0
+      && rect.height > 0;
+  };
+  const viewportW = window.innerWidth || document.documentElement.clientWidth;
+  const media = [...document.querySelectorAll('img, picture, canvas, svg, div')]
+    .filter(visible)
+    .map(el => ({ el, rect: el.getBoundingClientRect() }))
+    .filter(({ rect }) => {
+      const inRightRail = rect.left > viewportW * 0.45;
+      const avatarSized = rect.width >= 28 && rect.width <= 80 && rect.height >= 28 && rect.height <= 80;
+      const upperRail = rect.top > 80 && rect.top < (window.innerHeight || 900) * 0.75;
+      return inRightRail && avatarSized && upperRail;
+    })
+    .sort((a, b) => a.rect.top - b.rect.top);
+
+  for (const { rect } of media) {
+    const points = [
+      [rect.left + rect.width / 2, rect.bottom - 2],
+      [rect.left + rect.width / 2, rect.bottom + 4],
+      [rect.left + rect.width / 2, rect.top + rect.height * 0.72],
+    ];
+    for (const [x, y] of points) {
+      const el = document.elementFromPoint(x, y);
+      if (!el) continue;
+      const target = el.closest('button,[role="button"],a,div,span') || el;
+      if (!visible(target)) continue;
+      const text = [
+        target.textContent || '',
+        target.getAttribute?.('aria-label') || '',
+        target.getAttribute?.('data-e2e') || '',
+      ].join(' ');
+      if (/like|comment|share|favorite|bookmark/i.test(text)) continue;
+      target.click();
+      return true;
+    }
+  }
+  return false;
+}
+
+function fypAvatarPlusPoint() {
+  const visible = el => {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    return style.display !== 'none'
+      && style.visibility !== 'hidden'
+      && rect.width > 0
+      && rect.height > 0;
+  };
+  const viewportW = window.innerWidth || document.documentElement.clientWidth;
+  const viewportH = window.innerHeight || document.documentElement.clientHeight || 900;
+  const avatars = [...document.querySelectorAll('img')]
+    .filter(visible)
+    .map(el => ({ el, rect: el.getBoundingClientRect() }))
+    .filter(({ rect }) => {
+      const inRightRail = rect.left > viewportW * 0.55;
+      const avatarSized = rect.width >= 32 && rect.width <= 76 && rect.height >= 32 && rect.height <= 76;
+      const usefulY = rect.top > viewportH * 0.18 && rect.top < viewportH * 0.75;
+      return inRightRail && avatarSized && usefulY;
+    })
+    .sort((a, b) => a.rect.top - b.rect.top);
+
+  const avatar = avatars[0];
+  if (!avatar) return null;
+  const { rect } = avatar;
+  return {
+    x: Math.round(rect.left + rect.width / 2),
+    y: Math.round(rect.bottom + Math.min(14, Math.max(7, rect.height * 0.22))),
+  };
+}
+
 function clickFypPlusFollowButton() {
   const visible = el => {
     if (!el) return false;
@@ -227,6 +305,16 @@ export async function follow(page, plan) {
     let ok = false;
     for (let s = 0; s < 12; s++) {
       ok = await page.evaluate(clickFypPlusFollowButton).catch(() => false);
+      if (!ok) ok = await page.evaluate(clickFypAvatarPlusByGeometry).catch(() => false);
+      if (!ok) {
+        const point = await page.evaluate(fypAvatarPlusPoint).catch(() => null);
+        if (point) {
+          await page.mouse.move(point.x, point.y).catch(() => {});
+          await sleep(rand(250, 700));
+          await page.mouse.click(point.x, point.y).catch(() => {});
+          ok = true;
+        }
+      }
       if (ok) break;
       await page.keyboard.press('ArrowDown').catch(() => {});
       await sleep(rand(2000, 5000));
