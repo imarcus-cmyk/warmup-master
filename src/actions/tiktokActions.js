@@ -114,17 +114,52 @@ export async function notifications(page, plan) {
 export async function follow(page, plan) {
   const events = []; let follows = 0;
   const handles = shuffled(plan.handles || []).slice(0, plan.follow);
-  for (const h of handles) {
-    try {
-      await page.goto(`https://www.tiktok.com/@${h.replace(/^@/, '')}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      await sleep(rand(3000, 6000));
-      const ok = await page.evaluate(() => {
-        const b = document.querySelector('[data-e2e="follow-button"], button[aria-label*="follow" i]');
-        if (!b) return false; b.click(); return true;
+
+  if (handles.length) {
+    for (const h of handles) {
+      try {
+        await page.goto(`https://www.tiktok.com/@${h.replace(/^@/, '')}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+        await dismiss(page);
+        await sleep(rand(3000, 6000));
+        const ok = await page.evaluate(() => {
+          const b = document.querySelector('[data-e2e="follow-button"], button[aria-label*="follow" i]');
+          if (!b) return false;
+          if (/following/i.test((b.textContent || '') + ' ' + (b.getAttribute('aria-label') || ''))) return 'already';
+          b.click(); return true;
+        }).catch(() => false);
+        if (ok === true) { follows++; events.push(makeEvent('follow', { handle: h })); }
+        else if (ok === 'already') events.push(makeEvent('follow', { handle: h, note: 'already following' }));
+        else events.push(makeEvent('follow', { handle: h, error: 'follow button not found' }));
+        await sleep(rand(5000, 10000));
+      } catch (e) { events.push(makeEvent('follow', { handle: h, error: e.message })); }
+    }
+    return { follows, events };
+  }
+
+  try { await page.goto('https://www.tiktok.com/foryou', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+  await dismiss(page);
+  for (let i = 0; i < plan.follow; i++) {
+    if (overtime(plan)) break;
+    let ok = false;
+    for (let s = 0; s < 12; s++) {
+      ok = await page.evaluate(() => {
+        const buttons = [...document.querySelectorAll('[data-e2e*="follow" i], button[aria-label*="follow" i], button')];
+        const b = buttons.find(x => {
+          const text = ((x.textContent || '') + ' ' + (x.getAttribute('aria-label') || '')).trim();
+          return x.offsetParent !== null && /\bfollow\b/i.test(text) && !/following|follow back/i.test(text);
+        });
+        if (!b) return false;
+        b.scrollIntoView({ block: 'center' });
+        b.click();
+        return true;
       }).catch(() => false);
-      if (ok) { follows++; events.push(makeEvent('follow', { handle: h })); }
-      await sleep(rand(5000, 10000));
-    } catch (e) { events.push(makeEvent('follow', { handle: h, error: e.message })); }
+      if (ok) break;
+      await page.keyboard.press('ArrowDown').catch(() => {});
+      await sleep(rand(2000, 5000));
+    }
+    if (!ok) { events.push(makeEvent('follow', { skipped: 'no follow button found in fyp' })); break; }
+    follows++; events.push(makeEvent('follow', { fromFyp: true }));
+    await sleep(rand(5000, 10000));
   }
   return { follows, events };
 }

@@ -87,7 +87,7 @@ export async function followHandles(page, handles, n) {
 }
 
 // Feed-based fallback when no specific account is named: watch the For-You feed,
-// like on it, follow the given handles (if any).
+// like on it, and follow visible suggested accounts.
 async function runFeedTask(page, task) {
   const c = task.counts;
   const metrics = {}; const events = []; const notes = [];
@@ -97,8 +97,9 @@ async function runFeedTask(page, task) {
   if (plan.watchFyp > 0) add(await TT.watchFyp(page, plan), 'watches');
   if (plan.like > 0) add(await TT.like(page, plan), 'likes');
   if (plan.follow > 0) {
-    if (!plan.handles.length) notes.push('follow needs a target @handle on TikTok — none given, skipped (try "...follow @handle")');
-    else add(await TT.follow(page, plan), 'follows');
+    if (!plan.handles.length) notes.push('no @handle given — tried suggested accounts from the For You feed');
+    add(await TT.follow(page, plan), 'follows');
+    if ((metrics.follows || 0) < plan.follow) notes.push(`followed ${metrics.follows || 0}/${plan.follow}`);
   }
   return { metrics, events, notes };
 }
