@@ -82,20 +82,79 @@ export async function like(page, plan) {
   return { likes, events };
 }
 
+// Watch videos in the timeline. X autoplays muted video on scroll, so we scroll
+// a video into view, let it play, dwell, then move past it. Used by both the
+// daily warmup (plan.watchVideos from the ramp) and one-off Slack tasks.
+export async function watchVideos(page, plan) {
+  const events = []; let watches = 0;
+  try { await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+  await dismiss(page);
+  for (let i = 0; i < (plan.watchVideos || 0); i++) {
+    if (overtime(plan)) break;
+    let found = false;
+    for (let s = 0; s < 10; s++) {
+      found = await page.evaluate(() => {
+        const v = document.querySelector('[data-testid="videoComponent"] video, [data-testid="videoPlayer"] video, video');
+        if (v) { v.scrollIntoView({ block: 'center' }); try { v.muted = true; v.play && v.play(); } catch {} return true; }
+        return false;
+      }).catch(() => false);
+      if (found) break;
+      await page.evaluate(() => window.scrollBy(0, 700)).catch(() => {});
+      await sleep(rand(1500, 3500));
+    }
+    if (!found) { events.push(makeEvent('watchVideo', { skipped: 'no video found in feed' })); break; }
+    await sleep(rand(6000, 20000)); // watch dwell
+    watches++;
+    await page.evaluate(() => window.scrollBy(0, 900)).catch(() => {}); // past it, so the next find is new
+    await sleep(rand(1500, 3500));
+  }
+  events.push(makeEvent('watchVideo', { count: watches }));
+  return { watches, events };
+}
+
+// Follow accounts. With plan.handles → follow those specific accounts. With no
+// handles → follow accounts found in the feed / who-to-follow (the daily warmup
+// has no configured handles, so this is what makes daily follow actually work).
 export async function follow(page, plan) {
   const events = []; let follows = 0;
   const handles = shuffled(plan.handles || []).slice(0, plan.follow);
-  for (const h of handles) {
-    try {
-      await page.goto(`https://x.com/${h.replace(/^@/, '')}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      await sleep(rand(3000, 6000));
-      const ok = await page.evaluate(() => {
-        const b = document.querySelector('[data-testid$="-follow"]');
-        if (!b) return false; b.click(); return true;
+
+  if (handles.length) {
+    for (const h of handles) {
+      try {
+        await page.goto(`https://x.com/${h.replace(/^@/, '')}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+        await sleep(rand(3000, 6000));
+        const ok = await page.evaluate(() => {
+          const b = document.querySelector('[data-testid$="-follow"]');
+          if (!b) return false; b.click(); return true;
+        }).catch(() => false);
+        if (ok) { follows++; events.push(makeEvent('follow', { handle: h })); }
+        await sleep(rand(5000, 10000));
+      } catch (e) { events.push(makeEvent('follow', { handle: h, error: e.message })); }
+    }
+    return { follows, events };
+  }
+
+  // Feed-follow fallback (no specific target).
+  try { await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+  await dismiss(page);
+  for (let i = 0; i < plan.follow; i++) {
+    if (overtime(plan)) break;
+    let ok = false;
+    for (let s = 0; s < 10; s++) {
+      ok = await page.evaluate(() => {
+        const b = [...document.querySelectorAll('[data-testid$="-follow"]')]
+          .find(x => x.offsetParent !== null && /follow/i.test(x.textContent || '') && !/following/i.test(x.textContent || ''));
+        if (b) { b.scrollIntoView({ block: 'center' }); b.click(); return true; }
+        return false;
       }).catch(() => false);
-      if (ok) { follows++; events.push(makeEvent('follow', { handle: h })); }
-      await sleep(rand(5000, 10000));
-    } catch (e) { events.push(makeEvent('follow', { handle: h, error: e.message })); }
+      if (ok) break;
+      await page.evaluate(() => window.scrollBy(0, 800)).catch(() => {});
+      await sleep(rand(1500, 3500));
+    }
+    if (!ok) { events.push(makeEvent('follow', { skipped: 'no follow button found in feed' })); break; }
+    follows++; events.push(makeEvent('follow', { fromFeed: true }));
+    await sleep(rand(5000, 10000));
   }
   return { follows, events };
 }

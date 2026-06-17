@@ -4,10 +4,10 @@ import { resolvePlan } from '../core/ramp.js';
 import * as A from '../actions/twitterActions.js';
 
 const ramp = [
-  { phase: 'revive-1', maxDay: 2,        targets: { notifications: 1, search: 1, scrollFeed: 3, viewProfiles: 0, like: 0, follow: 0, bookmark: 0 }, opts: { followBackMax: 2 } },
-  { phase: 'revive-2', maxDay: 6,        targets: { notifications: 1, search: 2, scrollFeed: 5, viewProfiles: 1, like: 2, follow: 0, bookmark: 0 }, opts: { followBackMax: 2 } },
-  { phase: 'ramp',     maxDay: 13,       targets: { notifications: 1, search: 2, scrollFeed: 6, viewProfiles: 2, like: 4, follow: 1, bookmark: 1 }, opts: { followBackMax: 3 } },
-  { phase: 'steady',   maxDay: Infinity, targets: { notifications: 1, search: 3, scrollFeed: 8, viewProfiles: 3, like: 6, follow: 2, bookmark: 2 }, opts: { followBackMax: 5 } },
+  { phase: 'revive-1', maxDay: 2,        targets: { notifications: 1, search: 1, scrollFeed: 3, watchVideos: 2, viewProfiles: 0, like: 0, follow: 0, bookmark: 0 }, opts: { followBackMax: 2 } },
+  { phase: 'revive-2', maxDay: 6,        targets: { notifications: 1, search: 2, scrollFeed: 5, watchVideos: 3, viewProfiles: 1, like: 2, follow: 0, bookmark: 0 }, opts: { followBackMax: 2 } },
+  { phase: 'ramp',     maxDay: 13,       targets: { notifications: 1, search: 2, scrollFeed: 6, watchVideos: 4, viewProfiles: 2, like: 4, follow: 1, bookmark: 1 }, opts: { followBackMax: 3 } },
+  { phase: 'steady',   maxDay: Infinity, targets: { notifications: 1, search: 3, scrollFeed: 8, watchVideos: 6, viewProfiles: 3, like: 6, follow: 2, bookmark: 2 }, opts: { followBackMax: 5 } },
 ];
 
 // Live GoLogin profiles (fetched 2026-06-14). wokeUpAt = createdAt.
@@ -50,6 +50,7 @@ export default {
     return [
       m.searches && `${m.searches} search`,
       m.scrolls && `${m.scrolls} scroll`,
+      m.watches && `${m.watches} watch`,
       m.likes && `${m.likes} like`,
       m.follows && `${m.follows} follow`,
       m.followBacks && `${m.followBacks} followback`,
