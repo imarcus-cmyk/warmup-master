@@ -16,6 +16,36 @@ async function dismiss(page) {
   }).catch(() => {});
 }
 
+async function watchCurrentTikTokBeforeEngagement(page, plan) {
+  const startedAt = Date.now();
+  const maxWatchMs = rand(18000, 38000);
+  let sawVideoClock = false;
+
+  while (!overtime(plan) && Date.now() - startedAt < maxWatchMs) {
+    const state = await page.evaluate(() => {
+      const video = document.querySelector('video');
+      if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return null;
+      try { if (video.paused && video.play) video.play(); } catch {}
+      return {
+        currentTime: video.currentTime || 0,
+        duration: video.duration,
+        ended: !!video.ended,
+      };
+    }).catch(() => null);
+
+    if (state) {
+      sawVideoClock = true;
+      const remaining = state.duration - state.currentTime;
+      if (state.ended || state.currentTime >= state.duration * 0.85 || remaining <= 2.5) break;
+    }
+    await sleep(rand(900, 1800));
+  }
+
+  if (!sawVideoClock) await sleep(rand(10000, 22000));
+  await sleep(rand(700, 2200));
+  return Math.round((Date.now() - startedAt) / 1000);
+}
+
 function clickTikTokFollowButton() {
   const visible = el => {
     if (!el) return false;
@@ -240,7 +270,7 @@ export async function like(page, plan) {
   await dismiss(page);
   for (let i = 0; i < plan.like; i++) {
     if (overtime(plan)) break;
-    await sleep(rand(4000, 10000)); // watch before liking
+    await watchCurrentTikTokBeforeEngagement(page, plan);
     const ok = await page.evaluate(() => {
       const b = document.querySelector('[data-e2e="like-icon"], button[aria-label*="like" i]');
       if (!b) return false; b.click(); return true;
@@ -287,7 +317,7 @@ export async function follow(page, plan) {
       try {
         await page.goto(`https://www.tiktok.com/@${h.replace(/^@/, '')}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
         await dismiss(page);
-        await sleep(rand(3000, 6000));
+        await sleep(rand(8000, 18000));
         const ok = await page.evaluate(clickTikTokFollowButton).catch(() => false);
         if (ok === true) { follows++; events.push(makeEvent('follow', { handle: h })); }
         else if (ok === 'already') events.push(makeEvent('follow', { handle: h, note: 'already following' }));
@@ -304,6 +334,7 @@ export async function follow(page, plan) {
     if (overtime(plan)) break;
     let ok = false;
     for (let s = 0; s < 12; s++) {
+      await watchCurrentTikTokBeforeEngagement(page, plan);
       ok = await page.evaluate(clickFypPlusFollowButton).catch(() => false);
       if (!ok) ok = await page.evaluate(clickFypAvatarPlusByGeometry).catch(() => false);
       if (!ok) {
@@ -346,7 +377,7 @@ export async function comment(page, plan) {
   await dismiss(page);
   for (let i = 0; i < plan.comment; i++) {
     if (overtime(plan)) break;
-    await sleep(rand(5000, 12000));
+    await watchCurrentTikTokBeforeEngagement(page, plan);
     const text = shuffled(DEFAULT_COMMENTS)[0];
     const ok = await page.evaluate((value) => {
       const commentButton = document.querySelector('[data-e2e="comment-icon"], button[aria-label*="comment" i]');

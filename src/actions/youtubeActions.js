@@ -115,6 +115,43 @@ async function openActiveShortComments(page) {
   }).catch(() => false);
 }
 
+async function watchActiveShortBeforeEngagement(page, plan) {
+  const startedAt = Date.now();
+  const maxWatchMs = rand(22000, 42000);
+  let sawVideoClock = false;
+
+  while (!overtime(plan) && Date.now() - startedAt < maxWatchMs) {
+    const state = await page.evaluate(() => {
+      const active = document.querySelector('ytd-reel-video-renderer[is-active]')
+        || document.querySelector('#shorts-player')
+        || document;
+      const video = active.querySelector('video') || document.querySelector('video');
+      if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return null;
+      try { if (video.paused && video.play) video.play(); } catch {}
+      return {
+        currentTime: video.currentTime || 0,
+        duration: video.duration,
+        ended: !!video.ended,
+      };
+    }).catch(() => null);
+
+    if (state) {
+      sawVideoClock = true;
+      const remaining = state.duration - state.currentTime;
+      if (state.ended || state.currentTime >= state.duration * 0.85 || remaining <= 2.5) break;
+    }
+
+    await sleep(rand(900, 1800));
+  }
+
+  if (!sawVideoClock) await sleep(rand(12000, 24000));
+  await sleep(rand(800, 2500)); // small human pause after viewing, before reacting
+  return {
+    watchedMs: Date.now() - startedAt,
+    usedVideoClock: sawVideoClock,
+  };
+}
+
 export async function search(page, plan) {
   const events = []; let searches = 0;
   for (const q of shuffled(queries(plan.niches)).slice(0, plan.search)) {
@@ -162,7 +199,12 @@ export async function shorts(page, plan) {
   await dismiss(page);
   for (let i = 0; i < plan.shorts; i++) {
     if (overtime(plan)) break;
-    await sleep(rand(5000, 20000)); // watch the current short
+    const watch = await watchActiveShortBeforeEngagement(page, plan);
+    events.push(makeEvent('shortWatch', {
+      onShort: i,
+      watchedSec: Math.round(watch.watchedMs / 1000),
+      fullWatchSignal: watch.usedVideoClock,
+    }));
 
     // like some shorts, spread out (probabilistic so it's not the first N)
     const didLike = likes < likeQuota && (strictQuotas || Math.random() < 0.5)
@@ -217,7 +259,7 @@ export async function comment(page, plan) {
   await dismiss(page);
   for (let i = 0; i < plan.comment; i++) {
     if (overtime(plan)) break;
-    await sleep(rand(6000, 14000));
+    await watchActiveShortBeforeEngagement(page, plan);
     const text = shuffled(DEFAULT_COMMENTS)[0];
     await openActiveShortComments(page);
     await sleep(rand(1200, 2500));

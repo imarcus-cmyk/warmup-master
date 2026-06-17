@@ -27,6 +27,21 @@ async function dismiss(page) {
   }).catch(() => {});
 }
 
+async function viewCurrentInstagramContentBeforeEngagement(page, plan) {
+  const startedAt = Date.now();
+  await page.evaluate(() => {
+    const post = [...document.querySelectorAll('article, main')]
+      .find(el => el.offsetParent !== null);
+    if (post) post.scrollIntoView({ block: 'center' });
+  }).catch(() => {});
+  await sleep(rand(7000, 18000));
+  if (!overtime(plan) && Math.random() < 0.4) {
+    await page.evaluate(() => window.scrollBy(0, 120 + Math.random() * 260)).catch(() => {});
+    await sleep(rand(3000, 8000));
+  }
+  return Math.round((Date.now() - startedAt) / 1000);
+}
+
 export async function scrollFeed(page, plan) {
   const events = []; let scrolls = 0;
   try { await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
@@ -98,7 +113,7 @@ export async function like(page, plan) {
   await dismiss(page);
   for (let i = 0; i < plan.like; i++) {
     if (overtime(plan)) break;
-    await sleep(rand(5000, 12000)); // spread out, never bursted
+    await viewCurrentInstagramContentBeforeEngagement(page, plan);
     const ok = await page.evaluate(() => {
       const els = [...document.querySelectorAll('svg[aria-label="Like"]')];
       const el = els[Math.floor(Math.random() * els.length)];
@@ -226,7 +241,7 @@ export async function follow(page, plan) {
   for (const h of targetHandles) {
     try {
       await page.goto(`https://www.instagram.com/${h.replace(/^@/, '')}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      await sleep(rand(3000, 6000));
+      await viewCurrentInstagramContentBeforeEngagement(page, plan);
       const ok = await page.evaluate(() => {
         const b = [...document.querySelectorAll('button')].find(x => /^follow$/i.test((x.textContent || '').trim()));
         if (!b) return false; b.click(); return true;
@@ -244,7 +259,7 @@ export async function comment(page, plan) {
   await dismiss(page);
   for (let i = 0; i < plan.comment; i++) {
     if (overtime(plan)) break;
-    await sleep(rand(5000, 12000));
+    await viewCurrentInstagramContentBeforeEngagement(page, plan);
     const text = shuffled(DEFAULT_COMMENTS)[0];
     const ok = await page.evaluate((value) => {
       const textarea = [...document.querySelectorAll('textarea[aria-label*="comment" i], textarea')]

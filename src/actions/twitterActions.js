@@ -16,6 +16,21 @@ async function dismiss(page) {
   }).catch(() => {});
 }
 
+async function readVisibleTweetBeforeEngagement(page, plan) {
+  const startedAt = Date.now();
+  await page.evaluate(() => {
+    const article = [...document.querySelectorAll('article')]
+      .find(a => a.offsetParent !== null);
+    if (article) article.scrollIntoView({ block: 'center' });
+  }).catch(() => {});
+  await sleep(rand(6000, 16000));
+  if (!overtime(plan) && Math.random() < 0.45) {
+    await page.evaluate(() => window.scrollBy(0, 140 + Math.random() * 260)).catch(() => {});
+    await sleep(rand(3000, 9000));
+  }
+  return Math.round((Date.now() - startedAt) / 1000);
+}
+
 export async function search(page, plan) {
   const events = []; let searches = 0;
   for (const q of shuffled(topics(plan.niches)).slice(0, plan.search)) {
@@ -64,6 +79,7 @@ export async function viewProfiles(page, plan) {
 async function clickAriaN(page, label, n) {
   let done = 0;
   for (let i = 0; i < n; i++) {
+    await readVisibleTweetBeforeEngagement(page);
     const ok = await page.evaluate(lbl => {
       const els = [...document.querySelectorAll(`[data-testid="${lbl}"], [aria-label*="${lbl}" i]`)]
         .filter(el => {
@@ -210,7 +226,7 @@ export async function follow(page, plan) {
     for (const h of handles) {
       try {
         await page.goto(`https://x.com/${h.replace(/^@/, '')}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
-        await sleep(rand(3000, 6000));
+        await readVisibleTweetBeforeEngagement(page, plan);
         const method = await followFromLoadedTwitterSurface(page);
         if (method) { follows++; events.push(makeEvent('follow', { handle: h, method })); }
         else events.push(makeEvent('follow', { handle: h, skipped: 'follow control not found' }));
@@ -228,6 +244,7 @@ export async function follow(page, plan) {
     let ok = false;
     let method = null;
     for (let s = 0; s < 10; s++) {
+      await readVisibleTweetBeforeEngagement(page, plan);
       method = await followFromLoadedTwitterSurface(page);
       ok = !!method;
       if (ok) break;
@@ -285,6 +302,7 @@ export async function comment(page, plan) {
   for (let i = 0; i < plan.comment; i++) {
     if (overtime(plan)) break;
     const text = shuffled(DEFAULT_COMMENTS)[0];
+    await readVisibleTweetBeforeEngagement(page, plan);
     const ok = await page.evaluate((value) => {
       const reply = [...document.querySelectorAll('[data-testid="reply"], [aria-label*="reply" i]')]
         .find(x => x.offsetParent !== null);

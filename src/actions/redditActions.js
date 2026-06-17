@@ -17,6 +17,23 @@ async function dismiss(page) {
   }).catch(() => {});
 }
 
+async function readVisibleRedditContentBeforeEngagement(page, plan) {
+  const startedAt = Date.now();
+  await page.evaluate(() => {
+    const post = document.querySelector('shreddit-post, article, [data-testid="post-container"]');
+    if (post) post.scrollIntoView({ block: 'center' });
+  }).catch(() => {});
+  const dwell = rand(18000, 65000);
+  const chunks = rand(2, 5);
+  for (let i = 0; i < chunks; i++) {
+    if (overtime(plan)) break;
+    await sleep(Math.floor(dwell / chunks));
+    await page.evaluate(() => window.scrollBy(0, 250 + Math.random() * 450)).catch(() => {});
+  }
+  await sleep(rand(800, 2500));
+  return Math.round((Date.now() - startedAt) / 1000);
+}
+
 export async function browseSubs(page, plan) {
   const events = []; let visits = 0;
   for (const s of shuffled(subs(plan.niches)).slice(0, plan.browseSubs)) {
@@ -103,6 +120,7 @@ export async function upvote(page, plan) {
   const events = []; let upvotes = 0;
   for (let i = 0; i < plan.upvote; i++) {
     if (overtime(plan)) break;
+    await readVisibleRedditContentBeforeEngagement(page, plan);
     const ok = await page.evaluate(() => {
       const els = [...document.querySelectorAll('button[aria-label*="upvote" i], [data-post-click-location="vote"] button')];
       const b = els[Math.floor(Math.random() * els.length)];
@@ -122,7 +140,7 @@ export async function join(page, plan) {
   for (const s of list) {
     try {
       await page.goto(`https://www.reddit.com/r/${s.replace(/^r\//, '')}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      await sleep(rand(3000, 6000));
+      await readVisibleRedditContentBeforeEngagement(page, plan);
       const ok = await page.evaluate(() => {
         const b = [...document.querySelectorAll('button')].find(x => /^join$/i.test((x.textContent || '').trim()));
         if (!b) return false; b.click(); return true;
@@ -148,7 +166,7 @@ export async function comment(page, plan) {
         return a.href;
       }).catch(() => null);
       if (!href) { events.push(makeEvent('comment', { skipped: 'no post found' })); break; }
-      await sleep(rand(4000, 8000));
+      await readVisibleRedditContentBeforeEngagement(page, plan);
       const text = shuffled(DEFAULT_COMMENTS)[0];
       const ok = await page.evaluate((value) => {
         const box = document.querySelector('[contenteditable="true"], textarea[name="comment"], textarea');
