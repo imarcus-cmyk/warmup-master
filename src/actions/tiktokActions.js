@@ -16,6 +16,43 @@ async function dismiss(page) {
   }).catch(() => {});
 }
 
+function clickTikTokFollowButton() {
+  const visible = el => {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    return style.display !== 'none'
+      && style.visibility !== 'hidden'
+      && rect.width > 0
+      && rect.height > 0;
+  };
+  const labelOf = el => [
+    el.textContent || '',
+    el.getAttribute('aria-label') || '',
+    el.getAttribute('title') || '',
+    el.getAttribute('data-e2e') || '',
+  ].join(' ').trim();
+  const candidates = [
+    ...document.querySelectorAll([
+      '[data-e2e*="follow" i]',
+      '[aria-label*="follow" i]',
+      'button',
+      'div[role="button"]',
+      'span[role="button"]',
+    ].join(',')),
+  ];
+  const button = candidates.find(el => {
+    const text = labelOf(el);
+    return visible(el)
+      && /\bfollow\b|browse-follow|user-follow|follow-button/i.test(text)
+      && !/following|follow back|followers/i.test(text);
+  });
+  if (!button) return false;
+  button.scrollIntoView({ block: 'center' });
+  button.click();
+  return true;
+}
+
 // The core signal: swipe the For-You feed, dwell per clip.
 export async function watchFyp(page, plan) {
   const events = []; let watches = 0;
@@ -122,12 +159,7 @@ export async function follow(page, plan) {
         await page.goto(`https://www.tiktok.com/@${h.replace(/^@/, '')}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
         await dismiss(page);
         await sleep(rand(3000, 6000));
-        const ok = await page.evaluate(() => {
-          const b = document.querySelector('[data-e2e="follow-button"], button[aria-label*="follow" i]');
-          if (!b) return false;
-          if (/following/i.test((b.textContent || '') + ' ' + (b.getAttribute('aria-label') || ''))) return 'already';
-          b.click(); return true;
-        }).catch(() => false);
+        const ok = await page.evaluate(clickTikTokFollowButton).catch(() => false);
         if (ok === true) { follows++; events.push(makeEvent('follow', { handle: h })); }
         else if (ok === 'already') events.push(makeEvent('follow', { handle: h, note: 'already following' }));
         else events.push(makeEvent('follow', { handle: h, error: 'follow button not found' }));
@@ -143,20 +175,24 @@ export async function follow(page, plan) {
     if (overtime(plan)) break;
     let ok = false;
     for (let s = 0; s < 12; s++) {
-      ok = await page.evaluate(() => {
-        const buttons = [...document.querySelectorAll('[data-e2e*="follow" i], button[aria-label*="follow" i], button')];
-        const b = buttons.find(x => {
-          const text = ((x.textContent || '') + ' ' + (x.getAttribute('aria-label') || '')).trim();
-          return x.offsetParent !== null && /\bfollow\b/i.test(text) && !/following|follow back/i.test(text);
-        });
-        if (!b) return false;
-        b.scrollIntoView({ block: 'center' });
-        b.click();
-        return true;
-      }).catch(() => false);
+      ok = await page.evaluate(clickTikTokFollowButton).catch(() => false);
       if (ok) break;
       await page.keyboard.press('ArrowDown').catch(() => {});
       await sleep(rand(2000, 5000));
+    }
+    if (!ok) {
+      const tag = shuffled(tags(plan.niches))[0];
+      try {
+        await page.goto(`https://www.tiktok.com/search/user?q=${encodeURIComponent(tag)}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+        await dismiss(page);
+        await sleep(rand(4000, 8000));
+        for (let s = 0; s < 5; s++) {
+          ok = await page.evaluate(clickTikTokFollowButton).catch(() => false);
+          if (ok) break;
+          await page.evaluate(() => window.scrollBy(0, 600 + Math.random() * 700)).catch(() => {});
+          await sleep(rand(2000, 5000));
+        }
+      } catch {}
     }
     if (!ok) { events.push(makeEvent('follow', { skipped: 'no follow button found in fyp' })); break; }
     follows++; events.push(makeEvent('follow', { fromFyp: true }));
