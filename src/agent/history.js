@@ -177,6 +177,7 @@ function formatMetrics(metrics = {}) {
     scrolls: 'scrolls',
     searches: 'searches',
     likes: 'likes',
+    dislikes: 'dislikes',
     follows: 'follows',
     followBacks: 'followbacks',
     subscribes: 'subs',

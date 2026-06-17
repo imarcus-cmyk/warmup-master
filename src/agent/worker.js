@@ -38,6 +38,7 @@ function summarize(result) {
   const parts = [
     (m.watches || m.reels || m.shorts) && `${m.watches || m.reels || m.shorts} watched`,
     m.likes && `${m.likes} liked`,
+    m.dislikes && `${m.dislikes} disliked`,
     m.upvotes && `${m.upvotes} upvoted`,
     m.follows && `${m.follows} followed`,
     m.subscribes && `${m.subscribes} subscribed`,

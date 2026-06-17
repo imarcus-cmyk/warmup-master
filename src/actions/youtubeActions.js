@@ -16,6 +16,71 @@ async function dismiss(page) {
   }).catch(() => {});
 }
 
+async function clickActiveShortControl(page, names, blocked = []) {
+  return page.evaluate(({ names, blocked }) => {
+    const visible = el => {
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+    };
+    const textFor = el => `${el.textContent || ''} ${el.getAttribute('aria-label') || ''}`.trim();
+    const active = document.querySelector('ytd-reel-video-renderer[is-active]')
+      || document.querySelector('#shorts-player')
+      || document;
+    const buttons = [...active.querySelectorAll('button, yt-button-shape button, [role="button"]')];
+    const control = buttons.find(button => {
+      if (!visible(button)) return false;
+      const text = textFor(button);
+      return names.some(name => new RegExp(`\\b${name}\\b`, 'i').test(text))
+        && !blocked.some(name => new RegExp(`\\b${name}\\b`, 'i').test(text));
+    });
+    if (!control) return false;
+    control.scrollIntoView({ block: 'center' });
+    control.click();
+    return true;
+  }, { names, blocked }).catch(() => false);
+}
+
+async function clickActiveShortSubscribe(page) {
+  return page.evaluate(() => {
+    const visible = el => {
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+    };
+    const active = document.querySelector('ytd-reel-video-renderer[is-active]')
+      || document.querySelector('#shorts-player')
+      || document;
+    const buttons = [...active.querySelectorAll('button, yt-button-shape button, [role="button"]')];
+    const subscribe = buttons.find(button => {
+      if (!visible(button)) return false;
+      const text = `${button.textContent || ''} ${button.getAttribute('aria-label') || ''}`;
+      return /\bsubscribe\b/i.test(text) && !/\bsubscribed\b|\bunsubscribe\b/i.test(text);
+    });
+    if (!subscribe) return false;
+    subscribe.scrollIntoView({ block: 'center' });
+    subscribe.click();
+    return true;
+  }).catch(() => false);
+}
+
+async function openActiveShortComments(page) {
+  if (await clickActiveShortControl(page, ['comment', 'comments'], [])) return true;
+  return page.evaluate(() => {
+    const active = document.querySelector('ytd-reel-video-renderer[is-active]')
+      || document.querySelector('#shorts-player')
+      || document;
+    const buttons = [...active.querySelectorAll('button, yt-button-shape button, [role="button"]')];
+    const comment = buttons.find(button => {
+      const text = `${button.textContent || ''} ${button.getAttribute('aria-label') || ''}`;
+      return button.offsetParent !== null && /comment/i.test(text);
+    });
+    if (!comment) return false;
+    comment.click();
+    return true;
+  }).catch(() => false);
+}
+
 export async function search(page, plan) {
   const events = []; let searches = 0;
   for (const q of shuffled(queries(plan.niches)).slice(0, plan.search)) {
@@ -54,8 +119,9 @@ export async function scrollHome(page, plan) {
 // on the short currently playing (quotas from plan.likeOnShorts / subscribeOnShorts),
 // spread across the run — never on a page with no video.
 export async function shorts(page, plan) {
-  const events = []; let shorts = 0; let likes = 0; let subscribes = 0;
+  const events = []; let shorts = 0; let likes = 0; let dislikes = 0; let subscribes = 0;
   const likeQuota = plan.likeOnShorts || 0;
+  const dislikeQuota = plan.dislikeOnShorts || 0;
   const subQuota = plan.subscribeOnShorts || 0;
   try { await page.goto('https://www.youtube.com/shorts', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
   await dismiss(page);
@@ -65,26 +131,25 @@ export async function shorts(page, plan) {
 
     // like some shorts, spread out (probabilistic so it's not the first N)
     if (likes < likeQuota && Math.random() < 0.5) {
-      const ok = await page.evaluate(() => {
-        const b = document.querySelector('ytd-reel-video-renderer[is-active] #like-button button, #shorts-player button[aria-label*="like" i], button[aria-label^="like" i]');
-        if (!b) return false; b.click(); return true;
-      }).catch(() => false);
+      const ok = await clickActiveShortControl(page, ['like'], ['dislike', 'unlike']);
       if (ok) { likes++; events.push(makeEvent('like', { onShort: i })); await sleep(rand(1500, 4000)); }
+    }
+    // dislike stays opt-in for one-off tasks; daily warmup does not request it.
+    if (dislikes < dislikeQuota && Math.random() < 0.5) {
+      const ok = await clickActiveShortControl(page, ['dislike'], ['remove']);
+      if (ok) { dislikes++; events.push(makeEvent('dislike', { onShort: i })); await sleep(rand(1500, 4000)); }
     }
     // subscribe rarely
     if (subscribes < subQuota && Math.random() < 0.3) {
-      const ok = await page.evaluate(() => {
-        const b = document.querySelector('ytd-reel-video-renderer[is-active] #subscribe-button button, #shorts-player [aria-label*="Subscribe" i]');
-        if (!b) return false; b.click(); return true;
-      }).catch(() => false);
+      const ok = await clickActiveShortSubscribe(page);
       if (ok) { subscribes++; events.push(makeEvent('subscribe', { onShort: i })); await sleep(rand(1500, 4000)); }
     }
 
     await page.keyboard.press('ArrowDown').catch(() => {});
     shorts++;
   }
-  events.push(makeEvent('shorts', { count: shorts, likes, subscribes }));
-  return { shorts, likes, subscribes, events };
+  events.push(makeEvent('shorts', { count: shorts, likes, dislikes, subscribes }));
+  return { shorts, likes, dislikes, subscribes, events };
 }
 
 // Open the notifications bell once and read it. YouTube has no follow-back
@@ -114,15 +179,19 @@ export async function comment(page, plan) {
     if (overtime(plan)) break;
     await sleep(rand(6000, 14000));
     const text = shuffled(DEFAULT_COMMENTS)[0];
+    await openActiveShortComments(page);
+    await sleep(rand(1200, 2500));
     const ok = await page.evaluate((value) => {
-      const commentButton = document.querySelector('ytd-reel-video-renderer[is-active] button[aria-label*="comment" i], #shorts-player button[aria-label*="comment" i]');
-      if (commentButton) commentButton.click();
-      const input = document.querySelector('#contenteditable-root[contenteditable="true"], div[contenteditable="true"], textarea');
+      const input = [...document.querySelectorAll('#contenteditable-root[contenteditable="true"], div[contenteditable="true"], textarea')]
+        .find(el => el.offsetParent !== null);
       if (!input) return false;
       input.focus();
       document.execCommand('insertText', false, value);
       const submit = [...document.querySelectorAll('button, yt-button-shape button')]
-        .find(b => /comment|post|send/i.test((b.textContent || '') + ' ' + (b.getAttribute('aria-label') || '')));
+        .find(b => {
+          const text = `${b.textContent || ''} ${b.getAttribute('aria-label') || ''}`;
+          return b.offsetParent !== null && /comment|post|send/i.test(text) && !b.disabled;
+        });
       if (!submit) return false;
       submit.click();
       return true;

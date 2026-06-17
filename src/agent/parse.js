@@ -71,6 +71,7 @@ export function parseCounts(text) {
   return {
     watch: countFor(text, ['watch']),
     like: countFor(text, ['like']),
+    dislike: countFor(text, ['dislike']),
     follow: countFor(text, ['follow']),
     subscribe: countFor(text, ['subscribe']),
     view: countFor(text, ['view', 'visit']),
@@ -108,8 +109,8 @@ const FILLER_TOKENS = new Set([
 // First action word ends the profile-name portion of the request.
 const ACTION_TOKENS = new Set([
   'do', 'did', 'does', 'perform', 'performs', 'performed', 'make', 'run',
-  'watch', 'watches', 'watched', 'like', 'likes', 'liked', 'follow', 'follows',
-  'followed', 'following', 'subscribe', 'subscribes', 'subscribed', 'view',
+  'watch', 'watches', 'watched', 'like', 'likes', 'liked', 'dislike', 'dislikes',
+  'disliked', 'follow', 'follows', 'followed', 'following', 'subscribe', 'subscribes', 'subscribed', 'view',
   'views', 'viewed', 'visit', 'visits', 'visited', 'upvote', 'upvotes', 'upvoted',
   'join', 'joins', 'joined', 'read', 'reads', 'scroll', 'scrolls', 'scrolled',
   'browse', 'browses', 'search', 'searches', 'bookmark', 'bookmarks',

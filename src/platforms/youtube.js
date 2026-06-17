@@ -130,6 +130,7 @@ export default {
       m.shorts && `${m.shorts} shorts`,
       m.searches && `${m.searches} search`,
       m.likes && `${m.likes} like`,
+      m.dislikes && `${m.dislikes} dislike`,
       m.subscribes && `${m.subscribes} sub`,
     ];
   },
