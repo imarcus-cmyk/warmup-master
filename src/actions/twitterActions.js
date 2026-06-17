@@ -4,6 +4,7 @@ import { makeEvent } from '../core/runLog.js';
 import { rand, sleep, shuffled, overtime } from '../core/util.js';
 
 const DEFAULT_TOPICS = ['tech news', 'startup', 'ai tools', 'design'];
+const DEFAULT_COMMENTS = ['Nice', 'Great point', 'Interesting', 'Thanks for sharing'];
 const topics = ns => (ns && ns.length ? ns : DEFAULT_TOPICS);
 
 async function dismiss(page) {
@@ -194,4 +195,34 @@ export async function bookmark(page, plan) {
   const bookmarks = await clickAriaN(page, 'bookmark', plan.bookmark);
   events.push(makeEvent('bookmark', { count: bookmarks }));
   return { bookmarks, events };
+}
+
+export async function comment(page, plan) {
+  const events = []; let comments = 0;
+  try { await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+  await dismiss(page);
+  for (let i = 0; i < plan.comment; i++) {
+    if (overtime(plan)) break;
+    const text = shuffled(DEFAULT_COMMENTS)[0];
+    const ok = await page.evaluate((value) => {
+      const reply = [...document.querySelectorAll('[data-testid="reply"]')]
+        .find(x => x.offsetParent !== null);
+      if (!reply) return false;
+      reply.scrollIntoView({ block: 'center' });
+      reply.click();
+      const box = document.querySelector('[data-testid="tweetTextarea_0"][contenteditable="true"], div[role="textbox"][contenteditable="true"]');
+      if (!box) return false;
+      box.focus();
+      document.execCommand('insertText', false, value);
+      const send = document.querySelector('[data-testid="tweetButton"], [data-testid="tweetButtonInline"]');
+      if (!send) return false;
+      send.click();
+      return true;
+    }, text).catch(() => false);
+    if (ok) { comments++; events.push(makeEvent('comment', { fromFeed: true })); }
+    else events.push(makeEvent('comment', { skipped: 'reply box not found' }));
+    await sleep(rand(5000, 10000));
+    await page.evaluate(() => window.scrollBy(0, 800)).catch(() => {});
+  }
+  return { comments, events };
 }

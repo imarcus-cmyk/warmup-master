@@ -5,6 +5,7 @@ import { rand, sleep, shuffled, overtime } from '../core/util.js';
 
 const DEFAULT_SUBS = ['popular', 'all', 'mildlyinteresting', 'todayilearned'];
 const DEFAULT_QUERIES = ['best of 2026', 'how to', 'explain'];
+const DEFAULT_COMMENTS = ['Interesting', 'Thanks for sharing', 'Good point', 'Nice'];
 const subs = ns => (ns && ns.length ? ns : DEFAULT_SUBS);
 
 async function dismiss(page) {
@@ -131,4 +132,45 @@ export async function join(page, plan) {
     } catch (e) { events.push(makeEvent('join', { sub: s, error: e.message })); }
   }
   return { joins, events };
+}
+
+export async function comment(page, plan) {
+  const events = []; let comments = 0;
+  if (plan.browseSubs) await browseSubs(page, { ...plan, browseSubs: Math.max(1, plan.browseSubs) });
+  for (let i = 0; i < plan.comment; i++) {
+    if (overtime(plan)) break;
+    try {
+      const href = await page.evaluate(() => {
+        const links = [...document.querySelectorAll('a[href*="/comments/"]')];
+        const a = links[Math.floor(Math.random() * Math.min(links.length, 15))];
+        if (!a) return null;
+        a.click();
+        return a.href;
+      }).catch(() => null);
+      if (!href) { events.push(makeEvent('comment', { skipped: 'no post found' })); break; }
+      await sleep(rand(4000, 8000));
+      const text = shuffled(DEFAULT_COMMENTS)[0];
+      const ok = await page.evaluate((value) => {
+        const box = document.querySelector('[contenteditable="true"], textarea[name="comment"], textarea');
+        if (!box) return false;
+        box.focus();
+        if (box.tagName === 'TEXTAREA') {
+          box.value = value;
+          box.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
+        } else {
+          document.execCommand('insertText', false, value);
+        }
+        const submit = [...document.querySelectorAll('button')]
+          .find(b => /comment|reply/i.test((b.textContent || '').trim()) && !b.disabled);
+        if (!submit) return false;
+        submit.click();
+        return true;
+      }, text).catch(() => false);
+      if (ok) { comments++; events.push(makeEvent('comment', { url: href })); }
+      else events.push(makeEvent('comment', { url: href, skipped: 'comment box not found' }));
+      await sleep(rand(5000, 10000));
+      await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    } catch (e) { events.push(makeEvent('comment', { error: e.message })); }
+  }
+  return { comments, events };
 }

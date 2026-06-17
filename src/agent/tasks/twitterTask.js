@@ -19,9 +19,13 @@ export async function runTwitterTask(page, task) {
     bookmark: c.bookmark || 0,
     search: c.search || 0,
     viewProfiles: c.view || 0,
+    notifications: c.notifications || 0,
+    comment: c.comment || 0,
+    followBackMax: 0,
   };
   const add = (r, ...keys) => { for (const k of keys) if (r[k]) metrics[k] = (metrics[k] || 0) + r[k]; events.push(...r.events); };
 
+  if (plan.notifications > 0) add(await TW.notifications(page, plan), 'notificationsOpened');
   if (watchN > 0) {
     add(await TW.watchVideos(page, { ...plan, watchVideos: watchN }), 'watches');
     if ((metrics.watches || 0) < watchN) notes.push(`watched ${metrics.watches || 0}/${watchN} videos (no more videos surfaced in the feed)`);
@@ -38,6 +42,10 @@ export async function runTwitterTask(page, task) {
     // handles present → follow those; none → feed-follow (helper handles both)
     add(await TW.follow(page, { ...plan, follow: followN, handles: task.targets }), 'follows');
     if ((metrics.follows || 0) < followN) notes.push(`followed ${metrics.follows || 0}/${followN}`);
+  }
+  if (plan.comment > 0) {
+    add(await TW.comment(page, plan), 'comments');
+    if ((metrics.comments || 0) < plan.comment) notes.push(`commented ${metrics.comments || 0}/${plan.comment}`);
   }
   return { metrics, events, notes };
 }

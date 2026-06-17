@@ -4,6 +4,7 @@ import { makeEvent } from '../core/runLog.js';
 import { rand, sleep, shuffled, overtime } from '../core/util.js';
 
 const DEFAULT_QUERIES = ['how to', 'review 2026', 'tutorial', 'documentary'];
+const DEFAULT_COMMENTS = ['Nice video', 'Thanks for sharing', 'Great short', 'Interesting'];
 const queries = ns => (ns && ns.length ? ns : DEFAULT_QUERIES);
 
 async function dismiss(page) {
@@ -103,6 +104,35 @@ export async function notifications(page, plan) {
     events.push(makeEvent('notifications', { opened: 1 }));
   } catch (e) { events.push(makeEvent('notifications', { error: e.message })); }
   return { notificationsOpened, events };
+}
+
+export async function comment(page, plan) {
+  const events = []; let comments = 0;
+  try { await page.goto('https://www.youtube.com/shorts', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+  await dismiss(page);
+  for (let i = 0; i < plan.comment; i++) {
+    if (overtime(plan)) break;
+    await sleep(rand(6000, 14000));
+    const text = shuffled(DEFAULT_COMMENTS)[0];
+    const ok = await page.evaluate((value) => {
+      const commentButton = document.querySelector('ytd-reel-video-renderer[is-active] button[aria-label*="comment" i], #shorts-player button[aria-label*="comment" i]');
+      if (commentButton) commentButton.click();
+      const input = document.querySelector('#contenteditable-root[contenteditable="true"], div[contenteditable="true"], textarea');
+      if (!input) return false;
+      input.focus();
+      document.execCommand('insertText', false, value);
+      const submit = [...document.querySelectorAll('button, yt-button-shape button')]
+        .find(b => /comment|post|send/i.test((b.textContent || '') + ' ' + (b.getAttribute('aria-label') || '')));
+      if (!submit) return false;
+      submit.click();
+      return true;
+    }, text).catch(() => false);
+    if (ok) { comments++; events.push(makeEvent('comment', { onShort: true })); }
+    else events.push(makeEvent('comment', { skipped: 'comment box not found' }));
+    await page.keyboard.press('ArrowDown').catch(() => {});
+    await sleep(rand(5000, 10000));
+  }
+  return { comments, events };
 }
 
 // Standalone like/subscribe removed — they happen inside shorts() now (shorts-only).

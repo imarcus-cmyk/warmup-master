@@ -44,8 +44,9 @@ function countFor(text, verbs) {
   let present = false;
   for (const verb of verbs) {
     if (new RegExp(`\\b${verb}(?:s|es|ed|ing)?\\b`, 'i').test(t)) present = true;
-    const re = new RegExp(`\\b${verb}(?:s|es|ed)?\\b(?:\\s+\\w+){0,1}\\s+(${NUM})\\b`, 'i');
-    const m = t.match(re);
+    const after = new RegExp(`\\b${verb}(?:s|es|ed)?\\b(?:\\s+(?:the|a|an|some))?\\s+(${NUM})\\b`, 'i');
+    const before = new RegExp(`(?:^|\\b(?:do|and|then|also|plus)\\s+)(${NUM})\\s+${verb}(?:s|es|ed|ing)?\\b`, 'i');
+    const m = t.match(after) || t.match(before);
     if (m) {
       const raw = m[1];
       const n = /^\d+$/.test(raw) ? Number(raw) : WORD_NUM[raw];
@@ -79,6 +80,8 @@ export function parseCounts(text) {
     scroll: countFor(text, ['scroll', 'browse']),
     bookmark: countFor(text, ['bookmark']),
     read: countFor(text, ['read']),
+    notifications: countFor(text, ['notification', 'notifications', 'inbox']),
+    comment: countFor(text, ['comment', 'reply']),
   };
 }
 
@@ -110,6 +113,8 @@ const ACTION_TOKENS = new Set([
   'views', 'viewed', 'visit', 'visits', 'visited', 'upvote', 'upvotes', 'upvoted',
   'join', 'joins', 'joined', 'read', 'reads', 'scroll', 'scrolls', 'scrolled',
   'browse', 'browses', 'search', 'searches', 'bookmark', 'bookmarks',
+  'notification', 'notifications', 'inbox', 'comment', 'comments', 'commented',
+  'reply', 'replies', 'replied',
   'and', 'then', 'also', 'plus',
 ]);
 

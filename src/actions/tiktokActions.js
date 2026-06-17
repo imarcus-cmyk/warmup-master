@@ -4,6 +4,7 @@ import { makeEvent } from '../core/runLog.js';
 import { rand, sleep, shuffled, overtime } from '../core/util.js';
 
 const DEFAULT_TAGS = ['fyp', 'diy', 'homedecor', 'satisfying'];
+const DEFAULT_COMMENTS = ['Nice', 'Love this', 'Good one', 'So cool', 'Great video'];
 const tags = ns => (ns && ns.length ? ns : DEFAULT_TAGS);
 
 async function dismiss(page) {
@@ -162,4 +163,33 @@ export async function follow(page, plan) {
     await sleep(rand(5000, 10000));
   }
   return { follows, events };
+}
+
+export async function comment(page, plan) {
+  const events = []; let comments = 0;
+  try { await page.goto('https://www.tiktok.com/foryou', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+  await dismiss(page);
+  for (let i = 0; i < plan.comment; i++) {
+    if (overtime(plan)) break;
+    await sleep(rand(5000, 12000));
+    const text = shuffled(DEFAULT_COMMENTS)[0];
+    const ok = await page.evaluate((value) => {
+      const commentButton = document.querySelector('[data-e2e="comment-icon"], button[aria-label*="comment" i]');
+      if (commentButton) commentButton.click();
+      const input = document.querySelector('[contenteditable="true"], textarea');
+      if (!input) return false;
+      input.focus();
+      document.execCommand('insertText', false, value);
+      const submit = [...document.querySelectorAll('button,div[role="button"]')]
+        .find(b => /post|send|comment/i.test((b.textContent || '') + ' ' + (b.getAttribute('aria-label') || '')));
+      if (!submit) return false;
+      submit.click();
+      return true;
+    }, text).catch(() => false);
+    if (ok) { comments++; events.push(makeEvent('comment', { fromFyp: true })); }
+    else events.push(makeEvent('comment', { skipped: 'comment box not found' }));
+    await page.keyboard.press('ArrowDown').catch(() => {});
+    await sleep(rand(4000, 9000));
+  }
+  return { comments, events };
 }

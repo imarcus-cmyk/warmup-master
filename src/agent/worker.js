@@ -47,6 +47,8 @@ function summarize(result) {
     m.reads && `${m.reads} read`,
     m.scrolls && `${m.scrolls} scrolled`,
     m.searches && `${m.searches} searched`,
+    m.notificationsOpened && `${m.notificationsOpened} notifications opened`,
+    m.comments && `${m.comments} commented`,
   ].filter(Boolean);
   return parts.join(', ') || 'no actions completed';
 }

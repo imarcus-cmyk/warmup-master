@@ -92,14 +92,20 @@ async function runFeedTask(page, task) {
   const c = task.counts;
   const metrics = {}; const events = []; const notes = [];
   const plan = { niches: [], handles: task.targets, dwell: [6, 18], _deadlineAt: task._deadlineAt,
-    watchFyp: c.watch || 0, like: c.like || 0, follow: (c.follow || 0) + (c.subscribe || 0) };
+    watchFyp: c.watch || 0, like: c.like || 0, follow: (c.follow || 0) + (c.subscribe || 0),
+    notifications: c.notifications || 0, comment: c.comment || 0, followBackMax: 0 };
   const add = (r, ...keys) => { for (const k of keys) if (r[k]) metrics[k] = (metrics[k] || 0) + r[k]; events.push(...r.events); };
+  if (plan.notifications > 0) add(await TT.notifications(page, plan), 'notificationsOpened');
   if (plan.watchFyp > 0) add(await TT.watchFyp(page, plan), 'watches');
   if (plan.like > 0) add(await TT.like(page, plan), 'likes');
   if (plan.follow > 0) {
     if (!plan.handles.length) notes.push('no @handle given — tried suggested accounts from the For You feed');
     add(await TT.follow(page, plan), 'follows');
     if ((metrics.follows || 0) < plan.follow) notes.push(`followed ${metrics.follows || 0}/${plan.follow}`);
+  }
+  if (plan.comment > 0) {
+    add(await TT.comment(page, plan), 'comments');
+    if ((metrics.comments || 0) < plan.comment) notes.push(`commented ${metrics.comments || 0}/${plan.comment}`);
   }
   return { metrics, events, notes };
 }
@@ -112,7 +118,12 @@ export async function runTikTokTask(page, task) {
   const metrics = {}; const events = [];
   const primary = task.targets[0];
   const dwell = [6, 18];
+  const followN = (task.counts.follow || 0) + (task.counts.subscribe || 0);
 
+  if (task.counts.notifications > 0) {
+    const { notificationsOpened, events: e } = await TT.notifications(page, { followBackMax: 0, _deadlineAt: task._deadlineAt });
+    metrics.notificationsOpened = (metrics.notificationsOpened || 0) + notificationsOpened; events.push(...e);
+  }
   if (task.counts.watch > 0 && primary) {
     const { watches, events: e } = await watchProfileVideos(page, primary, task.counts.watch, dwell);
     metrics.watches = (metrics.watches || 0) + watches; events.push(...e);
@@ -123,9 +134,13 @@ export async function runTikTokTask(page, task) {
     const { likes, events: e } = await likeCurrent(page, task.counts.like);
     metrics.likes = (metrics.likes || 0) + likes; events.push(...e);
   }
-  if (task.counts.follow > 0 && task.targets.length) {
-    const { follows, events: e } = await followHandles(page, task.targets, task.counts.follow);
+  if (followN > 0 && task.targets.length) {
+    const { follows, events: e } = await followHandles(page, task.targets, followN);
     metrics.follows = (metrics.follows || 0) + follows; events.push(...e);
+  }
+  if (task.counts.comment > 0) {
+    const { comments, events: e } = await TT.comment(page, { comment: task.counts.comment, _deadlineAt: task._deadlineAt });
+    metrics.comments = (metrics.comments || 0) + comments; events.push(...e);
   }
   return { metrics, events };
 }

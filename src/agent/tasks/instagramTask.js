@@ -13,9 +13,16 @@ export async function runInstagramTask(page, task) {
     watchReels: task.counts.watch || 0,
     like: task.counts.like || 0,
     follow: (task.counts.follow || 0) + (task.counts.subscribe || 0),
+    notifications: task.counts.notifications || 0,
+    comment: task.counts.comment || 0,
+    followBackMax: 0,
     _deadlineAt: task._deadlineAt,
   };
 
+  if (plan.notifications > 0) {
+    const { notificationsOpened, events: e } = await IG.notifications(page, plan);
+    metrics.notificationsOpened = (metrics.notificationsOpened || 0) + notificationsOpened; events.push(...e);
+  }
   if (plan.watchReels > 0) {
     const { reels, events: e } = await IG.watchReels(page, plan);
     metrics.reels = (metrics.reels || 0) + reels; events.push(...e);
@@ -31,6 +38,11 @@ export async function runInstagramTask(page, task) {
     const { follows, events: e } = await IG.follow(page, plan);
     metrics.follows = (metrics.follows || 0) + follows; events.push(...e);
     if (follows < plan.follow) notes.push(`followed ${follows}/${plan.follow}`);
+  }
+  if (plan.comment > 0) {
+    const { comments, events: e } = await IG.comment(page, plan);
+    metrics.comments = (metrics.comments || 0) + comments; events.push(...e);
+    if (comments < plan.comment) notes.push(`commented ${comments}/${plan.comment}`);
   }
   return { metrics, events, notes };
 }

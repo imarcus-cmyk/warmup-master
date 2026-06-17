@@ -14,6 +14,7 @@ const DEFAULT_HANDLES = [
   'betterhomesandgardens',
   'dwellmagazine',
 ];
+const DEFAULT_COMMENTS = ['Nice', 'Love this', 'So good', 'Beautiful'];
 const queries = ns => (ns && ns.length ? ns : DEFAULT_QUERIES);
 const handles = hs => (hs && hs.length ? hs : DEFAULT_HANDLES);
 
@@ -235,4 +236,33 @@ export async function follow(page, plan) {
     } catch (e) { events.push(makeEvent('follow', { handle: h, error: e.message })); }
   }
   return { follows, events };
+}
+
+export async function comment(page, plan) {
+  const events = []; let comments = 0;
+  try { await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+  await dismiss(page);
+  for (let i = 0; i < plan.comment; i++) {
+    if (overtime(plan)) break;
+    await sleep(rand(5000, 12000));
+    const text = shuffled(DEFAULT_COMMENTS)[0];
+    const ok = await page.evaluate((value) => {
+      const textarea = [...document.querySelectorAll('textarea[aria-label*="comment" i], textarea')]
+        .find(x => x.offsetParent !== null);
+      if (!textarea) return false;
+      textarea.focus();
+      textarea.value = value;
+      textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
+      const post = [...document.querySelectorAll('div[role="button"],button')]
+        .find(b => /^post$/i.test((b.textContent || '').trim()));
+      if (!post) return false;
+      post.click();
+      return true;
+    }, text).catch(() => false);
+    if (ok) { comments++; events.push(makeEvent('comment', { fromFeed: true })); }
+    else events.push(makeEvent('comment', { skipped: 'comment box not found' }));
+    await page.evaluate(() => window.scrollBy(0, 800)).catch(() => {});
+    await sleep(rand(5000, 10000));
+  }
+  return { comments, events };
 }
