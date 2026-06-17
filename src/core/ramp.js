@@ -26,20 +26,41 @@ export function resolvePlan(account, { ramp, freshShiftDays = 4 }) {
   let effDays = rawDays;
   if (mode === 'freshNew') effDays = Math.max(0, rawDays - freshShiftDays);
 
-  let window;
+  let idx;
   if (mode === 'maintained') {
-    window = ramp[ramp.length - 1];
+    idx = ramp.length - 1;
   } else {
-    window = ramp.find(w => effDays <= w.maxDay) || ramp[ramp.length - 1];
+    idx = ramp.findIndex(w => effDays <= w.maxDay);
+    if (idx === -1) idx = ramp.length - 1;
   }
+  const window = ramp[idx];
+  const isFinalWindow = idx === ramp.length - 1;
+  const nextWindow = isFinalWindow ? null : ramp[idx + 1];
+  // Effective days until the next phase opens; null once at the final window.
+  const daysUntilNextPhase = nextWindow ? Math.max(0, window.maxDay + 1 - effDays) : null;
 
   const targets = { ...window.targets };
   return {
     days: rawDays,
+    effDays,
     mode,
     phase: window.phase,
     niches: account.niches || [],
     actions: buildActions(targets),
+    // ---- full plan context: the whole ramp + where this account sits in it ----
+    windowIndex: idx,
+    totalWindows: ramp.length,
+    isFinalWindow,
+    // graduated = reached the final (steady) window → done warming, ready for use.
+    graduated: isFinalWindow,
+    nextPhase: nextWindow ? nextWindow.phase : null,
+    daysUntilNextPhase,
+    rampPlan: ramp.map((w, i) => ({
+      phase: w.phase,
+      maxDay: w.maxDay,
+      actions: buildActions(w.targets),
+      current: i === idx,
+    })),
     ...window.opts,
     ...targets,
   };

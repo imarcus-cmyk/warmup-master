@@ -83,3 +83,15 @@ export async function sendUnclassifiedAlert(list) {
     + `(Instagram/Tiktok/Twitter/Reddit/Youtube):\n${lines}`,
   );
 }
+
+// Graduation alert — account finished warmup (reached steady) and is ready for
+// manual upload. Fired ONCE per account (dedupe handled by graduation.js).
+export async function sendGraduationAlert(platform, list) {
+  if (!list.length) return;
+  const mention = SLACK_MENTION_USER_ID ? `<@${SLACK_MENTION_USER_ID}> ` : '';
+  const names = list.map(r => r.name).join(', ');
+  await postSlack(
+    `:mortar_board: ${mention}${list.length} ${platform} account(s) finished warmup — `
+    + `now at steady, READY FOR MANUAL UPLOAD: ${names}`,
+  );
+}

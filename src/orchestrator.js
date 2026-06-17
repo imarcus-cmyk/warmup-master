@@ -23,7 +23,8 @@ import { token, rand, sleep } from './core/util.js';
 import { discoverAccounts, findUnclassified } from './core/discover.js';
 import { runAccount } from './core/runAccount.js';
 import { writeRunLog } from './core/runLog.js';
-import { sendSlackReport, sendUnclassifiedAlert } from './core/slack.js';
+import { sendSlackReport, sendUnclassifiedAlert, sendGraduationAlert } from './core/slack.js';
+import { recordGraduations } from './core/graduation.js';
 
 import twitter from './platforms/twitter.js';
 import youtube from './platforms/youtube.js';
@@ -149,6 +150,12 @@ async function runPlatform(def) {
     try {
       await sendSlackReport(results, { platform: def.label, slackParts: def.slackParts, newProfiles });
     } catch (err) { console.error(`slack report failed: ${err.message}`); }
+    // Once-per-account "ready for manual upload" alert for accounts that just
+    // reached steady. recordGraduations dedupes via logs/graduated.json.
+    try {
+      const fresh = await recordGraduations(def.label, results);
+      if (fresh.length) await sendGraduationAlert(def.label, fresh);
+    } catch (err) { console.error(`graduation alert failed: ${err.message}`); }
   }
 
   return results;

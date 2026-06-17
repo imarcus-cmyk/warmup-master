@@ -32,12 +32,25 @@ export async function runAccount(account, def) {
   const allowed = plan.actions;
   if (typeof def.logAccount === 'function') def.logAccount(account, plan);
 
+  // Full-plan visibility (every platform): where this account sits in its ramp.
+  const pos = `phase ${plan.phase} (${(plan.windowIndex ?? 0) + 1}/${plan.totalWindows})`;
+  const next = plan.graduated
+    ? 'FINAL — steady (warmup complete, ready for manual upload)'
+    : `next: ${plan.nextPhase} in ~${plan.daysUntilNextPhase}d`;
+  console.log(`  >> plan: ${pos}; ${next}`);
+  if (Array.isArray(plan.rampPlan)) {
+    console.log('  >> full ramp: ' + plan.rampPlan
+      .map(w => `${w.current ? '▶' : ' '}${w.phase}≤${w.maxDay === Infinity ? '∞' : w.maxDay}d`)
+      .join(' | '));
+  }
+
   const result = {
     platform: def.label,
     name,
     profileId,
     mode: plan.mode,
     phase: plan.phase,
+    graduated: !!plan.graduated,
     allowed,
     attempts: 0,
     status: 'failed',
