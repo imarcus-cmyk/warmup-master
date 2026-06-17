@@ -65,15 +65,101 @@ async function clickAriaN(page, label, n) {
   let done = 0;
   for (let i = 0; i < n; i++) {
     const ok = await page.evaluate(lbl => {
-      const els = [...document.querySelectorAll(`[data-testid="${lbl}"]`)];
+      const els = [...document.querySelectorAll(`[data-testid="${lbl}"], [aria-label*="${lbl}" i]`)]
+        .filter(el => {
+          const text = `${el.textContent || ''} ${el.getAttribute('aria-label') || ''}`;
+          return el.offsetParent !== null && !new RegExp(`un${lbl}|${lbl}d|remove`, 'i').test(text);
+        });
       const el = els[Math.floor(Math.random() * els.length)];
-      if (!el) return false; el.click(); return true;
+      if (!el) return false;
+      el.scrollIntoView({ block: 'center' });
+      el.click();
+      return true;
     }, label).catch(() => false);
     if (ok) done++;
     await sleep(rand(3000, 8000));
     await page.evaluate(() => window.scrollBy(0, 600)).catch(() => {});
   }
   return done;
+}
+
+async function clickVisibleFollowButton(page) {
+  return page.evaluate(() => {
+    const buttons = [...document.querySelectorAll('[data-testid$="-follow"], div[role="button"], button')];
+    const follow = buttons.find(b => {
+      const text = (b.textContent || '').trim();
+      const label = (b.getAttribute('aria-label') || '').trim();
+      const visible = b.offsetParent !== null;
+      return visible
+        && /\bfollow\b/i.test(`${text} ${label}`)
+        && !/\bfollowing\b|\bfollowers\b|\bfollowed you\b/i.test(`${text} ${label}`);
+    });
+    if (!follow) return false;
+    follow.scrollIntoView({ block: 'center' });
+    follow.click();
+    return true;
+  }).catch(() => false);
+}
+
+async function clickFollowFromHoverCard(page) {
+  const handles = await page.$$(
+    'article [data-testid="User-Name"] a[href^="/"], article a[role="link"][href^="/"]'
+  ).catch(() => []);
+
+  for (const handle of shuffled(handles).slice(0, 8)) {
+    try {
+      await handle.hover();
+      await sleep(rand(900, 1800));
+      const ok = await clickVisibleFollowButton(page);
+      if (ok) return true;
+    } catch {}
+  }
+  return false;
+}
+
+async function clickFollowFromPostMenu(page) {
+  return page.evaluate(() => {
+    const articles = [...document.querySelectorAll('article')].filter(a => a.offsetParent !== null);
+    const article = articles.find(a => {
+      const text = a.textContent || '';
+      return /@[a-z0-9_]{2,15}/i.test(text) || a.querySelector('[data-testid="User-Name"]');
+    }) || articles[0];
+    if (!article) return false;
+
+    const controls = [
+      ...article.querySelectorAll('[data-testid="caret"], [aria-label*="More" i], [aria-label*="more" i], div[role="button"], button'),
+    ];
+    const menu = controls.find(b => {
+      const label = b.getAttribute('aria-label') || '';
+      const testid = b.getAttribute('data-testid') || '';
+      return b.offsetParent !== null && (/caret/i.test(testid) || /\bmore\b/i.test(label));
+    });
+    if (!menu) return false;
+    menu.scrollIntoView({ block: 'center' });
+    menu.click();
+    return true;
+  }).catch(() => false).then(async opened => {
+    if (!opened) return false;
+    await sleep(rand(800, 1600));
+    return page.evaluate(() => {
+      const items = [...document.querySelectorAll('[role="menuitem"], div[role="button"], button')];
+      const item = items.find(i => {
+        const text = (i.textContent || '').trim();
+        const label = (i.getAttribute('aria-label') || '').trim();
+        return i.offsetParent !== null && /\bfollow\s+@/i.test(`${text} ${label}`);
+      });
+      if (!item) return false;
+      item.click();
+      return true;
+    }).catch(() => false);
+  });
+}
+
+async function followFromLoadedTwitterSurface(page) {
+  if (await clickVisibleFollowButton(page)) return 'visibleButton';
+  if (await clickFollowFromHoverCard(page)) return 'hoverCard';
+  if (await clickFollowFromPostMenu(page)) return 'postMenu';
+  return null;
 }
 
 export async function like(page, plan) {
@@ -125,11 +211,9 @@ export async function follow(page, plan) {
       try {
         await page.goto(`https://x.com/${h.replace(/^@/, '')}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
         await sleep(rand(3000, 6000));
-        const ok = await page.evaluate(() => {
-          const b = document.querySelector('[data-testid$="-follow"]');
-          if (!b) return false; b.click(); return true;
-        }).catch(() => false);
-        if (ok) { follows++; events.push(makeEvent('follow', { handle: h })); }
+        const method = await followFromLoadedTwitterSurface(page);
+        if (method) { follows++; events.push(makeEvent('follow', { handle: h, method })); }
+        else events.push(makeEvent('follow', { handle: h, skipped: 'follow control not found' }));
         await sleep(rand(5000, 10000));
       } catch (e) { events.push(makeEvent('follow', { handle: h, error: e.message })); }
     }
@@ -142,19 +226,16 @@ export async function follow(page, plan) {
   for (let i = 0; i < plan.follow; i++) {
     if (overtime(plan)) break;
     let ok = false;
+    let method = null;
     for (let s = 0; s < 10; s++) {
-      ok = await page.evaluate(() => {
-        const b = [...document.querySelectorAll('[data-testid$="-follow"]')]
-          .find(x => x.offsetParent !== null && /follow/i.test(x.textContent || '') && !/following/i.test(x.textContent || ''));
-        if (b) { b.scrollIntoView({ block: 'center' }); b.click(); return true; }
-        return false;
-      }).catch(() => false);
+      method = await followFromLoadedTwitterSurface(page);
+      ok = !!method;
       if (ok) break;
       await page.evaluate(() => window.scrollBy(0, 800)).catch(() => {});
       await sleep(rand(1500, 3500));
     }
     if (!ok) { events.push(makeEvent('follow', { skipped: 'no follow button found in feed' })); break; }
-    follows++; events.push(makeEvent('follow', { fromFeed: true }));
+    follows++; events.push(makeEvent('follow', { fromFeed: true, method }));
     await sleep(rand(5000, 10000));
   }
   return { follows, events };
@@ -205,7 +286,7 @@ export async function comment(page, plan) {
     if (overtime(plan)) break;
     const text = shuffled(DEFAULT_COMMENTS)[0];
     const ok = await page.evaluate((value) => {
-      const reply = [...document.querySelectorAll('[data-testid="reply"]')]
+      const reply = [...document.querySelectorAll('[data-testid="reply"], [aria-label*="reply" i]')]
         .find(x => x.offsetParent !== null);
       if (!reply) return false;
       reply.scrollIntoView({ block: 'center' });
