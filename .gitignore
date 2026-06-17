@@ -1,0 +1,5 @@
+node_modules/
+.claude/
+logs/*.json
+logs/*.out
+.env

@@ -1,0 +1,29 @@
+name: Twitter Warmup
+
+on:
+# schedule removed: DigitalOcean cron (/opt/warmup-master, daily 07:00 UTC) is the sole scheduler. Use the Run workflow button for manual runs.
+  workflow_dispatch:
+
+jobs:
+  warmup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45  # must exceed orchestrator deadlineMin for twitter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node src/orchestrator.js twitter
+        env:
+          GL_API_TOKEN: ${{ secrets.GL_API_TOKEN }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+          SLACK_MENTION_USER_ID: ${{ secrets.SLACK_MENTION_USER_ID }}
+      - name: Upload Twitter warmup logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: twitter-warmup-logs
+          path: logs/*.json
+          if-no-files-found: ignore

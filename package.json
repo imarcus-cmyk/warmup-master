@@ -1,0 +1,26 @@
+{
+  "name": "warmup-master",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Master orchestrator that drives a unique warmup plan per social platform across GoLogin cloud profiles.",
+  "scripts": {
+    "warmup": "node src/orchestrator.js",
+    "warmup:all": "node src/orchestrator.js all",
+    "warmup:twitter": "node src/orchestrator.js twitter",
+    "warmup:youtube": "node src/orchestrator.js youtube",
+    "warmup:tiktok": "node src/orchestrator.js tiktok",
+    "warmup:reddit": "node src/orchestrator.js reddit",
+    "warmup:instagram": "node src/orchestrator.js instagram",
+    "warmup:daily": "node scripts/dailyScheduler.js",
+    "slack:agent": "node src/agent/slackApp.js",
+    "check:unclassified": "node src/orchestrator.js --check-unclassified",
+    "validate": "node src/orchestrator.js --validate",
+    "deploy": "bash scripts/deploy.sh"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.7.3",
+    "dotenv": "^16.4.5",
+    "puppeteer-core": "^23.0.0"
+  }
+}
