@@ -53,6 +53,57 @@ function clickTikTokFollowButton() {
   return true;
 }
 
+function clickFypPlusFollowButton() {
+  const visible = el => {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    return style.display !== 'none'
+      && style.visibility !== 'hidden'
+      && rect.width > 0
+      && rect.height > 0;
+  };
+  const isPink = el => {
+    const style = window.getComputedStyle(el);
+    const colors = [style.backgroundColor, style.color, style.borderColor].join(' ');
+    return /rgb\(\s*254\s*,\s*44\s*,\s*85\s*\)|rgb\(\s*255\s*,\s*59\s*,\s*92\s*\)|#fe2c55/i.test(colors);
+  };
+  const labelOf = el => [
+    el.textContent || '',
+    el.getAttribute('aria-label') || '',
+    el.getAttribute('title') || '',
+    el.getAttribute('data-e2e') || '',
+  ].join(' ').trim();
+  const viewportW = window.innerWidth || document.documentElement.clientWidth;
+  const candidates = [
+    ...document.querySelectorAll([
+      '[data-e2e="browse-follow"]',
+      '[data-e2e*="follow" i]',
+      '[aria-label*="follow" i]',
+      'button',
+      'div[role="button"]',
+      'span[role="button"]',
+    ].join(',')),
+  ];
+  const button = candidates.find(el => {
+    if (!visible(el)) return false;
+    const rect = el.getBoundingClientRect();
+    const text = labelOf(el);
+    const inRightRail = rect.left > viewportW * 0.45;
+    const compact = rect.width >= 14 && rect.width <= 80 && rect.height >= 14 && rect.height <= 80;
+    const isFollow = /\bfollow\b|browse-follow|user-follow|follow-button/i.test(text);
+    const isPlus = /^\+$/.test(text) || el.querySelector('svg, path, circle, line');
+    return inRightRail
+      && compact
+      && !/following|follow back|followers/i.test(text)
+      && (isFollow || (isPlus && (isPink(el) || [...el.querySelectorAll('*')].some(isPink))));
+  });
+  if (!button) return false;
+  button.scrollIntoView({ block: 'center' });
+  button.click();
+  return true;
+}
+
 // The core signal: swipe the For-You feed, dwell per clip.
 export async function watchFyp(page, plan) {
   const events = []; let watches = 0;
@@ -175,7 +226,7 @@ export async function follow(page, plan) {
     if (overtime(plan)) break;
     let ok = false;
     for (let s = 0; s < 12; s++) {
-      ok = await page.evaluate(clickTikTokFollowButton).catch(() => false);
+      ok = await page.evaluate(clickFypPlusFollowButton).catch(() => false);
       if (ok) break;
       await page.keyboard.press('ArrowDown').catch(() => {});
       await sleep(rand(2000, 5000));
@@ -194,7 +245,7 @@ export async function follow(page, plan) {
         }
       } catch {}
     }
-    if (!ok) { events.push(makeEvent('follow', { skipped: 'no follow button found in fyp' })); break; }
+    if (!ok) { events.push(makeEvent('follow', { skipped: 'no TikTok FYP plus follow button found' })); break; }
     follows++; events.push(makeEvent('follow', { fromFyp: true }));
     await sleep(rand(5000, 10000));
   }
