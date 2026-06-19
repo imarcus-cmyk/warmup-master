@@ -4,10 +4,10 @@ import { resolvePlan } from '../core/ramp.js';
 import * as A from '../actions/redditActions.js';
 
 const ramp = [
-  { phase: 'revive-1', maxDay: 3,        targets: { notifications: 1, browseSubs: 2, search: 1, readPosts: 2, upvote: 0, join: 0 } },
-  { phase: 'revive-2', maxDay: 9,        targets: { notifications: 1, browseSubs: 3, search: 1, readPosts: 3, upvote: 2, join: 0 } },
-  { phase: 'ramp',     maxDay: 17,       targets: { notifications: 1, browseSubs: 3, search: 2, readPosts: 4, upvote: 4, join: 1 } },
-  { phase: 'steady',   maxDay: Infinity, targets: { notifications: 1, browseSubs: 4, search: 2, readPosts: 5, upvote: 6, join: 1 } },
+  { phase: 'revive-1', maxDay: 3,        targets: { notifications: 1, popular: 1, browseSubs: 1, explore: 1, search: 1, readPosts: 2, upvote: 0, join: 0 } },
+  { phase: 'revive-2', maxDay: 9,        targets: { notifications: 1, popular: 1, browseSubs: 2, explore: 1, search: 1, readPosts: 3, upvote: 2, join: 0 } },
+  { phase: 'ramp',     maxDay: 17,       targets: { notifications: 1, popular: 1, browseSubs: 2, explore: 1, search: 2, readPosts: 4, upvote: 4, join: 1 } },
+  { phase: 'steady',   maxDay: Infinity, targets: { notifications: 1, popular: 1, browseSubs: 3, explore: 1, search: 2, readPosts: 5, upvote: 6, join: 1 } },
 ];
 
 export const accounts = [
@@ -43,7 +43,9 @@ export default {
     const m = r.metrics || {};
     return [
       m.reads && `${m.reads} read`,
+      m.popularVisits && `${m.popularVisits} popular`,
       m.visits && `${m.visits} sub`,
+      m.explores && `${m.explores} explore`,
       m.searches && `${m.searches} search`,
       m.upvotes && `${m.upvotes} upvote`,
       m.joins && `${m.joins} join`,

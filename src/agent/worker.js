@@ -43,6 +43,8 @@ function summarize(result) {
     m.follows && `${m.follows} followed`,
     m.subscribes && `${m.subscribes} subscribed`,
     m.joins && `${m.joins} joined`,
+    m.popularVisits && `${m.popularVisits} popular viewed`,
+    m.explores && `${m.explores} explore viewed`,
     m.profileViews && `${m.profileViews} profiles viewed`,
     m.bookmarks && `${m.bookmarks} bookmarked`,
     m.reads && `${m.reads} read`,

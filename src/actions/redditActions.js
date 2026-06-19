@@ -7,6 +7,7 @@ const DEFAULT_SUBS = ['popular', 'all', 'mildlyinteresting', 'todayilearned'];
 const DEFAULT_QUERIES = ['best of 2026', 'how to', 'explain'];
 const DEFAULT_COMMENTS = ['Interesting', 'Thanks for sharing', 'Good point', 'Nice'];
 const subs = ns => (ns && ns.length ? ns : DEFAULT_SUBS);
+const EXPLORE_CATEGORIES = ['Most Visited', 'Internet Culture', 'Games', 'Technology', 'Places & Travel', 'Sports'];
 
 async function dismiss(page) {
   await page.evaluate(() => {
@@ -51,6 +52,64 @@ export async function browseSubs(page, plan) {
     } catch (e) { events.push(makeEvent('browseSub', { sub: s, error: e.message })); }
   }
   return { visits, events };
+}
+
+export async function popular(page, plan) {
+  const events = []; let popularVisits = 0;
+  for (let i = 0; i < plan.popular; i++) {
+    if (overtime(plan)) break;
+    try {
+      await page.goto('https://www.reddit.com/r/popular/', {
+        waitUntil: 'domcontentloaded', timeout: 45000,
+      });
+      await dismiss(page);
+      await sleep(rand(4000, 8000));
+      for (let j = 0; j < rand(2, 4); j++) {
+        await page.evaluate(() => window.scrollBy(0, 650 + Math.random() * 850)).catch(() => {});
+        await sleep(rand(2500, 6000));
+      }
+      events.push(makeEvent('popular', { feed: 'popular' }));
+      popularVisits++;
+    } catch (e) { events.push(makeEvent('popular', { error: e.message })); }
+  }
+  return { popularVisits, events };
+}
+
+export async function explore(page, plan) {
+  const events = []; let explores = 0;
+  for (let i = 0; i < plan.explore; i++) {
+    if (overtime(plan)) break;
+    try {
+      await page.goto('https://www.reddit.com/explore/', {
+        waitUntil: 'domcontentloaded', timeout: 45000,
+      });
+      await dismiss(page);
+      await sleep(rand(3500, 7000));
+      const category = shuffled(EXPLORE_CATEGORIES)[0];
+      const categoryUsed = await page.evaluate((label) => {
+        const button = [...document.querySelectorAll('button, a')]
+          .find(el => (el.textContent || '').trim().toLowerCase() === label.toLowerCase());
+        if (!button) return null;
+        button.click();
+        return label;
+      }, category).catch(() => null);
+      await sleep(rand(2500, 5000));
+      const joinVisible = await page.evaluate(() => {
+        const cards = [...document.querySelectorAll('button')];
+        return cards.some(el => /^join$/i.test((el.textContent || '').trim()));
+      }).catch(() => false);
+      for (let j = 0; j < rand(1, 3); j++) {
+        await page.evaluate(() => window.scrollBy(0, 500 + Math.random() * 700)).catch(() => {});
+        await sleep(rand(2000, 5000));
+      }
+      events.push(makeEvent('explore', {
+        category: categoryUsed || 'default',
+        suggestedJoinVisible: joinVisible,
+      }));
+      explores++;
+    } catch (e) { events.push(makeEvent('explore', { error: e.message })); }
+  }
+  return { explores, events };
 }
 
 export async function search(page, plan) {

@@ -202,7 +202,9 @@ TikTok ramps slowest on engagement (no like before day 4, no follow before day
 | Risk profile | Karma/age gated; voting/joining is sensitive, read-heavy warmup |
 
 **Unique actions** (`redditActions.js`):
+- `popular(page, target)` — open the Popular feed, scroll naturally → `{ popularVisits, events }`
 - `browseSubreddits(page, subs, target)` — open sub, scroll listing → `{ visits, events }`
+- `explore(page, target)` — open Explore Communities, scan category chips and cards → `{ explores, events }`
 - `searchPosts(page, queries, target)` → `{ searches, events }`
 - `readPosts(page, target)` — open post, scroll comments, dwell 20–90s → `{ reads, events }`
 - `upvotePosts(page, target)` → `{ upvotes, events }`
@@ -210,12 +212,12 @@ TikTok ramps slowest on engagement (no like before day 4, no follow before day
 
 **Warm plan ramp** (read-dominant; vote/join late):
 
-| phase | days | browseSubs | search | readPosts | upvote | join |
-|-------|------|-----------|--------|-----------|--------|------|
-| revive-1 | 0–3  | 2 | 1 | 2 | — | — |
-| revive-2 | 4–9  | 3 | 1 | 3 | 2 | — |
-| ramp     | 10–17| 3 | 2 | 4 | 4 | 1 |
-| steady   | 18+  | 4 | 2 | 5 | 6 | 1 |
+| phase | days | popular | browseSubs | explore | search | readPosts | upvote | join |
+|-------|------|---------|------------|---------|--------|-----------|--------|------|
+| revive-1 | 0–3  | 1 | 1 | 1 | 1 | 2 | — | — |
+| revive-2 | 4–9  | 1 | 2 | 1 | 1 | 3 | 2 | — |
+| ramp     | 10–17| 1 | 2 | 1 | 2 | 4 | 4 | 1 |
+| steady   | 18+  | 1 | 3 | 1 | 2 | 5 | 6 | 1 |
 
 Longest ramp of all platforms (steady at day 18). Never join >1 sub/run. No
 posting/commenting in warmup — read + vote only.

@@ -78,6 +78,8 @@ export function parseCounts(text) {
     view: countFor(text, ['view', 'visit']),
     upvote: countFor(text, ['upvote', 'upvotes']),
     join: countFor(text, ['join']),
+    popular: countFor(text, ['popular']),
+    explore: countFor(text, ['explore']),
     search: countFor(text, ['search']),
     scroll: countFor(text, ['scroll', 'browse']),
     bookmark: countFor(text, ['bookmark']),

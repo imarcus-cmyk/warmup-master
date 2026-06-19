@@ -13,7 +13,9 @@ export async function runRedditTask(page, task) {
   const plan = {
     niches: task.targets, // join/browse use these as subreddits when given
     _deadlineAt: task._deadlineAt,
+    popular: c.popular || 0,
     browseSubs: Math.max(c.scroll || 0, upvoteN ? 1 : 0),
+    explore: c.explore || 0,
     readPosts: readN,
     upvote: upvoteN,
     join: joinN,
@@ -24,7 +26,9 @@ export async function runRedditTask(page, task) {
   const add = (r, ...keys) => { for (const k of keys) if (r[k]) metrics[k] = (metrics[k] || 0) + r[k]; events.push(...r.events); };
 
   if (plan.notifications > 0) add(await RD.notifications(page, plan), 'notificationsOpened');
+  if (plan.popular > 0) add(await RD.popular(page, plan), 'popularVisits');
   if (plan.browseSubs > 0) add(await RD.browseSubs(page, plan), 'visits');
+  if (plan.explore > 0) add(await RD.explore(page, plan), 'explores');
   if (plan.readPosts > 0) add(await RD.readPosts(page, plan), 'reads');
   if (plan.upvote > 0) add(await RD.upvote(page, plan), 'upvotes');
   if (plan.search > 0) add(await RD.search(page, plan), 'searches');
