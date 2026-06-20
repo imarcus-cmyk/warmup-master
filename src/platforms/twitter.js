@@ -1,4 +1,4 @@
-// Twitter / X subagent definition. Unique: 40-min budget, strictest follow cap,
+// Twitter / X subagent definition. Unique: 60-min budget, strictest follow cap,
 // engagement unlocks late. Ramp from ORCHESTRATOR.md §2.1.
 import { resolvePlan } from '../core/ramp.js';
 import * as A from '../actions/twitterActions.js';
@@ -23,8 +23,8 @@ export default {
   key: 'twitter',
   label: 'Twitter',
   home: 'https://x.com/home',
-  deadlineMin: 40,
-  timeoutMin: 45,
+  deadlineMin: 60,
+  timeoutMin: 65,
   cron: '11 7 * * *',
   freshShiftDays: 4,
   caps: { follow: 2 }, // never exceed; enforced by orchestrator validation
