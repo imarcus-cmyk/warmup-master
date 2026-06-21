@@ -34,14 +34,27 @@ export function classify(profile) {
 }
 
 let _cache = null;
+// GoLogin v2 paginates at a fixed 30 profiles/page (the `limit` param is
+// ignored). Page until we've collected allProfilesCount — otherwise profiles
+// past the first page silently vanish from the cycle and never warm.
 export async function fetchProfiles({ refresh = false } = {}) {
   if (_cache && !refresh) return _cache;
-  const res = await fetch('https://api.gologin.com/browser/v2', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error(`GoLogin profile list failed: ${res.status}`);
-  const data = await res.json();
-  _cache = data.profiles || (Array.isArray(data) ? data : []);
+  const all = [];
+  let page = 1;
+  let total = Infinity;
+  while (all.length < total) {
+    const res = await fetch(`https://api.gologin.com/browser/v2?page=${page}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`GoLogin profile list failed: ${res.status}`);
+    const data = await res.json();
+    const batch = data.profiles || (Array.isArray(data) ? data : []);
+    if (!batch.length) break;
+    all.push(...batch);
+    total = Number.isFinite(data.allProfilesCount) ? data.allProfilesCount : all.length;
+    page += 1;
+  }
+  _cache = all;
   return _cache;
 }
 
