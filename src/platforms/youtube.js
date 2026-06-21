@@ -87,10 +87,15 @@ async function requireSignedIn(page) {
 // short currently playing) — they live in opts, not as standalone actions, so
 // they never run on a page with no video.
 const ramp = [
-  { phase: 'revive-1', maxDay: 2,        targets: { notifications: 1, search: 1, shorts: 3,  scrollHome: 2 }, opts: { likeOnShorts: 0, subscribeOnShorts: 0 } },
-  { phase: 'revive-2', maxDay: 6,        targets: { notifications: 1, search: 2, shorts: 6,  scrollHome: 3 }, opts: { likeOnShorts: 1, subscribeOnShorts: 0 } },
-  { phase: 'ramp',     maxDay: 13,       targets: { notifications: 1, search: 3, shorts: 10, scrollHome: 4 }, opts: { likeOnShorts: 2, subscribeOnShorts: 1 } },
-  { phase: 'steady',   maxDay: Infinity, targets: { notifications: 1, search: 3, shorts: 15, scrollHome: 5 }, opts: { likeOnShorts: 3, subscribeOnShorts: 1 } },
+  { phase: 'days-1-7',   maxDay: 7,        targets: { notifications: 1, search: [1, 2], shorts: [6, 8],  scrollHome: [2, 3] }, opts: { likeOnShorts: [1, 4], subscribeOnShorts: [0, 1] } },
+  { phase: 'days-8-14',  maxDay: 14,       targets: { notifications: 1, search: [2, 3], shorts: [8, 12], scrollHome: [3, 4] }, opts: { likeOnShorts: [3, 7], subscribeOnShorts: [1, 2] } },
+  { phase: 'days-15-21', maxDay: 21,       targets: { notifications: 1, search: [2, 3], shorts: [10, 14], scrollHome: [3, 5] }, opts: { likeOnShorts: [3, 6], subscribeOnShorts: [1, 2] } },
+  { phase: 'days-22-30', maxDay: 30,       targets: { notifications: 1, search: [3, 4], shorts: [12, 16], scrollHome: [4, 5] }, opts: { likeOnShorts: [4, 7], subscribeOnShorts: [1, 2] } },
+  { phase: 'days-31-45', maxDay: 45,       targets: { notifications: 1, search: [2, 4], shorts: [10, 14], scrollHome: [3, 5] }, opts: { likeOnShorts: [2, 5], subscribeOnShorts: [1, 2] } },
+  { phase: 'days-46-60', maxDay: 60,       targets: { notifications: 1, search: [2, 3], shorts: [8, 12],  scrollHome: [3, 4] }, opts: { likeOnShorts: [2, 4], subscribeOnShorts: [0, 1] } },
+  { phase: 'days-61-75', maxDay: 75,       targets: { notifications: 1, search: [1, 3], shorts: [6, 10],  scrollHome: [2, 4] }, opts: { likeOnShorts: [1, 3], subscribeOnShorts: [0, 1] } },
+  { phase: 'days-76-90', maxDay: 90,       targets: { notifications: 1, search: [1, 2], shorts: [5, 8],   scrollHome: [2, 3] }, opts: { likeOnShorts: [0, 2], subscribeOnShorts: [0, 1] } },
+  { phase: 'days-91+',   maxDay: Infinity, targets: { notifications: 1, search: [1, 2], shorts: [5, 8],   scrollHome: [2, 3] }, opts: { likeOnShorts: [0, 2], subscribeOnShorts: [0, 1] } },
 ];
 
 export const accounts = [
@@ -105,8 +110,8 @@ export default {
   deadlineMin: 110,
   timeoutMin: 120,
   cron: '31 7 * * *',
-  freshShiftDays: 4,
-  caps: { subscribeOnShorts: 1 },
+  freshShiftDays: 0,
+  caps: { subscribeOnShorts: 2 },
   blockSignals: {
     urls: [
       { re: /accounts\.google\.com\/(signin|ServiceLogin|v3\/signin)/i, reason: 'logged out / Google sign-in' },
@@ -119,7 +124,7 @@ export default {
   },
   accounts,
   actions: A,
-  planFor(account) { return resolvePlan(account, { ramp, freshShiftDays: 4 }); },
+  planFor(account) { return resolvePlan(account, { ramp, freshShiftDays: 0, warmupEndsDay: 30 }); },
   logAccount(account, plan) {
     console.log(`\n[${account.name}] (…${account.profileId.slice(-6)}) YT warmup — ${plan.days}d, ${plan.mode}/${plan.phase}`);
     console.log(`  shorts-only | allowed: ${plan.actions.join(', ') || '(none)'}`);

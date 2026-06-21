@@ -7,6 +7,12 @@ const DEFAULT_QUERIES = ['how to', 'review 2026', 'tutorial', 'documentary'];
 const DEFAULT_COMMENTS = ['Nice video', 'Thanks for sharing', 'Great short', 'Interesting'];
 const queries = ns => (ns && ns.length ? ns : DEFAULT_QUERIES);
 
+function pickSlots(total, count) {
+  const limit = Math.max(0, Math.min(total, count || 0));
+  const slots = shuffled([...Array(total).keys()]).slice(0, limit);
+  return new Set(slots);
+}
+
 async function dismiss(page) {
   await page.evaluate(() => {
     for (const b of document.querySelectorAll('button,tp-yt-paper-button,yt-button-shape button')) {
@@ -195,9 +201,13 @@ export async function shorts(page, plan) {
   const dislikeQuota = plan.dislikeOnShorts || 0;
   const subQuota = plan.subscribeOnShorts || 0;
   const strictQuotas = !!plan.strictQuotas;
+  const plannedShorts = plan.shorts || 0;
+  const likeSlots = pickSlots(plannedShorts, likeQuota);
+  const dislikeSlots = pickSlots(plannedShorts, dislikeQuota);
+  const subSlots = pickSlots(plannedShorts, subQuota);
   try { await page.goto('https://www.youtube.com/shorts', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
   await dismiss(page);
-  for (let i = 0; i < plan.shorts; i++) {
+  for (let i = 0; i < plannedShorts; i++) {
     if (overtime(plan)) break;
     const watch = await watchActiveShortBeforeEngagement(page, plan);
     events.push(makeEvent('shortWatch', {
@@ -207,7 +217,7 @@ export async function shorts(page, plan) {
     }));
 
     // like some shorts, spread out (probabilistic so it's not the first N)
-    const didLike = likes < likeQuota && (strictQuotas || Math.random() < 0.5)
+    const didLike = likes < likeQuota && (strictQuotas || likeSlots.has(i))
       ? await clickActiveShortControl(page, ['like'], ['dislike', 'unlike'])
       : false;
     if (didLike) {
@@ -217,12 +227,12 @@ export async function shorts(page, plan) {
     }
     // dislike stays opt-in for one-off tasks; daily warmup does not request it.
     const canDislikeThisShort = !strictQuotas || !didLike;
-    if (canDislikeThisShort && dislikes < dislikeQuota && (strictQuotas || Math.random() < 0.5)) {
+    if (canDislikeThisShort && dislikes < dislikeQuota && (strictQuotas || dislikeSlots.has(i))) {
       const ok = await clickActiveShortControl(page, ['dislike'], ['remove']);
       if (ok) { dislikes++; events.push(makeEvent('dislike', { onShort: i })); await sleep(rand(1500, 4000)); }
     }
     // subscribe rarely
-    if (subscribes < subQuota && (strictQuotas || Math.random() < 0.3)) {
+    if (subscribes < subQuota && (strictQuotas || subSlots.has(i))) {
       const ok = await clickActiveShortSubscribe(page);
       if (ok) { subscribes++; events.push(makeEvent('subscribe', { onShort: i })); await sleep(rand(1500, 4000)); }
     }

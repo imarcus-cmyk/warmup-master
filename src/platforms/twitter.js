@@ -4,10 +4,15 @@ import { resolvePlan } from '../core/ramp.js';
 import * as A from '../actions/twitterActions.js';
 
 const ramp = [
-  { phase: 'revive-1', maxDay: 2,        targets: { notifications: 1, search: 1, scrollFeed: 3, watchVideos: 2, viewProfiles: 0, like: 0, follow: 0, bookmark: 0 }, opts: { followBackMax: 2 } },
-  { phase: 'revive-2', maxDay: 6,        targets: { notifications: 1, search: 2, scrollFeed: 5, watchVideos: 3, viewProfiles: 1, like: 2, follow: 0, bookmark: 0 }, opts: { followBackMax: 2 } },
-  { phase: 'ramp',     maxDay: 13,       targets: { notifications: 1, search: 2, scrollFeed: 6, watchVideos: 4, viewProfiles: 2, like: 4, follow: 1, bookmark: 1 }, opts: { followBackMax: 3 } },
-  { phase: 'steady',   maxDay: Infinity, targets: { notifications: 1, search: 3, scrollFeed: 8, watchVideos: 6, viewProfiles: 3, like: 6, follow: 2, bookmark: 2 }, opts: { followBackMax: 5 } },
+  { phase: 'days-1-7',   maxDay: 7,        targets: { notifications: 1, search: [1, 2], scrollFeed: [3, 5], watchVideos: [2, 3], viewProfiles: [0, 1], like: [0, 1], follow: 0,      bookmark: [0, 1] }, opts: { followBackMax: 2 } },
+  { phase: 'days-8-14',  maxDay: 14,       targets: { notifications: 1, search: [2, 3], scrollFeed: [5, 7], watchVideos: [3, 4], viewProfiles: [1, 2], like: [2, 3], follow: [2, 3], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
+  { phase: 'days-15-21', maxDay: 21,       targets: { notifications: 1, search: [2, 3], scrollFeed: [6, 8], watchVideos: [4, 5], viewProfiles: [2, 3], like: [3, 5], follow: [1, 2], bookmark: [1, 2] }, opts: { followBackMax: 3 } },
+  { phase: 'days-22-30', maxDay: 30,       targets: { notifications: 1, search: [3, 4], scrollFeed: [7, 9], watchVideos: [5, 6], viewProfiles: [2, 4], like: [4, 6], follow: [1, 2], bookmark: [1, 2] }, opts: { followBackMax: 3 } },
+  { phase: 'days-31-45', maxDay: 45,       targets: { notifications: 1, search: [2, 4], scrollFeed: [6, 9], watchVideos: [4, 6], viewProfiles: [1, 3], like: [3, 5], follow: [0, 2], bookmark: [1, 2] }, opts: { followBackMax: 3 } },
+  { phase: 'days-46-60', maxDay: 60,       targets: { notifications: 1, search: [2, 4], scrollFeed: [5, 8], watchVideos: [3, 5], viewProfiles: [1, 3], like: [2, 4], follow: [0, 1], bookmark: [1, 2] }, opts: { followBackMax: 2 } },
+  { phase: 'days-61-75', maxDay: 75,       targets: { notifications: 1, search: [1, 3], scrollFeed: [4, 7], watchVideos: [2, 4], viewProfiles: [1, 2], like: [1, 3], follow: [0, 1], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
+  { phase: 'days-76-90', maxDay: 90,       targets: { notifications: 1, search: [1, 2], scrollFeed: [3, 6], watchVideos: [2, 3], viewProfiles: [0, 2], like: [1, 2], follow: [0, 1], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
+  { phase: 'days-91+',   maxDay: Infinity, targets: { notifications: 1, search: [1, 2], scrollFeed: [3, 6], watchVideos: [2, 3], viewProfiles: [0, 2], like: [1, 2], follow: [0, 1], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
 ];
 
 // Live GoLogin profiles (fetched 2026-06-14). wokeUpAt = createdAt.
@@ -26,8 +31,8 @@ export default {
   deadlineMin: 60,
   timeoutMin: 65,
   cron: '11 7 * * *',
-  freshShiftDays: 4,
-  caps: { follow: 2 }, // never exceed; enforced by orchestrator validation
+  freshShiftDays: 0,
+  caps: { follow: 3 }, // never exceed; enforced by orchestrator validation
   blockSignals: {
     urls: [
       { re: /\/(login|logout)\b|\/i\/flow\/login|\/account\/access/i, reason: 'logged out / login wall' },
@@ -40,7 +45,7 @@ export default {
   },
   accounts,
   actions: A,
-  planFor(account) { return resolvePlan(account, { ramp, freshShiftDays: 4 }); },
+  planFor(account) { return resolvePlan(account, { ramp, freshShiftDays: 0, warmupEndsDay: 30, manualUploadDay: 21 }); },
   logAccount(account, plan) {
     console.log(`\n[${account.name}] (…${account.profileId.slice(-6)}) X warmup — ${plan.days}d, ${plan.mode}/${plan.phase}`);
     console.log(`  allowed: ${plan.actions.join(', ') || '(none)'}`);

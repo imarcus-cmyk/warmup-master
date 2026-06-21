@@ -4,10 +4,15 @@ import { resolvePlan } from '../core/ramp.js';
 import * as A from '../actions/redditActions.js';
 
 const ramp = [
-  { phase: 'revive-1', maxDay: 3,        targets: { notifications: 1, popular: 1, browseSubs: 1, explore: 1, search: 1, readPosts: 2, upvote: 0, join: 0 } },
-  { phase: 'revive-2', maxDay: 9,        targets: { notifications: 1, popular: 1, browseSubs: 2, explore: 1, search: 1, readPosts: 3, upvote: 2, join: 0 } },
-  { phase: 'ramp',     maxDay: 17,       targets: { notifications: 1, popular: 1, browseSubs: 2, explore: 1, search: 2, readPosts: 4, upvote: 4, join: 1 } },
-  { phase: 'steady',   maxDay: Infinity, targets: { notifications: 1, popular: 1, browseSubs: 3, explore: 1, search: 2, readPosts: 5, upvote: 6, join: 1 } },
+  { phase: 'days-1-7',   maxDay: 7,        targets: { notifications: 1, popular: 1,     browseSubs: [1, 2], explore: 1,     search: [1, 2], readPosts: [4, 8], upvote: [0, 2], join: [1, 2] } },
+  { phase: 'days-8-14',  maxDay: 14,       targets: { notifications: 1, popular: 1,     browseSubs: [2, 3], explore: 1,     search: [1, 2], readPosts: [4, 6], upvote: [2, 4], join: [1, 2] } },
+  { phase: 'days-15-21', maxDay: 21,       targets: { notifications: 1, popular: 1,     browseSubs: [2, 4], explore: 1,     search: [2, 3], readPosts: [5, 7], upvote: [4, 7], join: [1, 2] } },
+  { phase: 'days-22-30', maxDay: 30,       targets: { notifications: 1, popular: 1,     browseSubs: [3, 4], explore: 1,     search: [2, 3], readPosts: [6, 8], upvote: [5, 9], join: [1, 2] } },
+  { phase: 'days-31-45', maxDay: 45,       targets: { notifications: 1, popular: 1,     browseSubs: [2, 4], explore: 1,     search: [1, 3], readPosts: [4, 7], upvote: [3, 6], join: [0, 1] } },
+  { phase: 'days-46-60', maxDay: 60,       targets: { notifications: 1, popular: 1,     browseSubs: [2, 3], explore: 1,     search: [1, 2], readPosts: [4, 6], upvote: [2, 5], join: [0, 1] } },
+  { phase: 'days-61-75', maxDay: 75,       targets: { notifications: 1, popular: [0, 1], browseSubs: [1, 3], explore: [0, 1], search: [1, 2], readPosts: [3, 5], upvote: [1, 4], join: [0, 1] } },
+  { phase: 'days-76-90', maxDay: 90,       targets: { notifications: 1, popular: [0, 1], browseSubs: [1, 2], explore: [0, 1], search: [0, 2], readPosts: [2, 4], upvote: [1, 3], join: 0 } },
+  { phase: 'days-91+',   maxDay: Infinity, targets: { notifications: 1, popular: [0, 1], browseSubs: [1, 2], explore: [0, 1], search: [0, 2], readPosts: [2, 4], upvote: [1, 3], join: 0 } },
 ];
 
 export const accounts = [
@@ -21,8 +26,8 @@ export default {
   deadlineMin: 45,
   timeoutMin: 50,
   cron: '11 8 * * *',
-  freshShiftDays: 5,
-  caps: { join: 1 },
+  freshShiftDays: 0,
+  caps: { join: 2 },
   blockSignals: {
     urls: [
       { re: /\/login|\/account-suspended/i, reason: 'logged out / login wall' },
@@ -34,7 +39,7 @@ export default {
   },
   accounts,
   actions: A,
-  planFor(account) { return resolvePlan(account, { ramp, freshShiftDays: 5 }); },
+  planFor(account) { return resolvePlan(account, { ramp, freshShiftDays: 0, warmupEndsDay: 30 }); },
   logAccount(account, plan) {
     console.log(`\n[${account.name}] (…${account.profileId.slice(-6)}) Reddit warmup — ${plan.days}d, ${plan.mode}/${plan.phase}`);
     console.log(`  allowed: ${plan.actions.join(', ') || '(none)'}`);

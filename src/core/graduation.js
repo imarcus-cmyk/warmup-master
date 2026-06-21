@@ -1,8 +1,14 @@
-// Graduation state. An account "graduates" when it reaches the final (steady)
-// ramp window — warmup is done and it's ready for manual upload. We alert ONCE
-// per account, so we persist which profileIds have already been announced.
+// Milestone state for warmup lifecycle alerts. We persist which lifecycle
+// milestones were already announced per profile so Slack only gets each alert
+// once, even though maintenance continues forever.
 //
-// State lives in logs/graduated.json: { [profileId]: { name, platform, at } }.
+// State lives in logs/graduated.json:
+// {
+//   "<profileId>": {
+//     warmupComplete: { name, platform, at },
+//     manualUploadReady: { name, platform, at }
+//   }
+// }
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -12,7 +18,7 @@ export async function loadGraduated() {
   try {
     return JSON.parse(await readFile(FILE, 'utf8'));
   } catch {
-    return {}; // missing/corrupt → start fresh
+    return {};
   }
 }
 
@@ -21,19 +27,31 @@ export async function saveGraduated(state) {
   await writeFile(FILE, JSON.stringify(state, null, 2));
 }
 
-// Given a platform's run results, return the accounts that graduated THIS run
-// and haven't been announced before. Records them so they won't alert again.
-// Only counts accounts that actually warmed ok (status 'ok') — a graduated but
-// blocked/failed profile isn't really ready.
-export async function recordGraduations(platform, results) {
+export async function recordMilestones(platform, results) {
   const state = await loadGraduated();
-  const fresh = [];
+  const fresh = {
+    warmupComplete: [],
+    manualUploadReady: [],
+  };
+
   for (const r of results) {
-    if (r.status !== 'ok' || !r.graduated) continue;
-    if (state[r.profileId]) continue;
-    state[r.profileId] = { name: r.name, platform, at: new Date().toISOString() };
-    fresh.push(r);
+    if (r.status !== 'ok') continue;
+    const current = state[r.profileId] || {};
+
+    if (r.warmupComplete && !current.warmupComplete) {
+      current.warmupComplete = { name: r.name, platform, at: new Date().toISOString() };
+      fresh.warmupComplete.push(r);
+    }
+    if (r.manualUploadReady && !current.manualUploadReady) {
+      current.manualUploadReady = { name: r.name, platform, at: new Date().toISOString() };
+      fresh.manualUploadReady.push(r);
+    }
+
+    if (Object.keys(current).length) state[r.profileId] = current;
   }
-  if (fresh.length) await saveGraduated(state);
+
+  if (fresh.warmupComplete.length || fresh.manualUploadReady.length) {
+    await saveGraduated(state);
+  }
   return fresh;
 }

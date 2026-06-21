@@ -5,11 +5,16 @@ const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const SLACK_REPORT_CHANNEL_ID = process.env.SLACK_REPORT_CHANNEL_ID || process.env.SLACK_CHANNEL_ID;
 const SLACK_MENTION_USER_ID = process.env.SLACK_MENTION_USER_ID;
 
+function isWeeklyStatusDay(date = new Date()) {
+  return date.getUTCDay() === 0;
+}
+
 export async function sendSlackReport(results, { platform, slackParts, newProfiles = [] }) {
   const ok = results.filter(r => r.status === 'ok');
   const failed = results.filter(r => r.status === 'failed');
   const skipped = results.filter(r => r.status === 'skipped');
   const blocked = results.filter(r => r.status === 'blocked');
+  const includeWeeklyStatus = isWeeklyStatusDay();
 
   const parts = [];
   const head = `*${platform} warmup* — ${ok.length}/${results.length} ok`
@@ -31,6 +36,16 @@ export async function sendSlackReport(results, { platform, slackParts, newProfil
     if (r.status === 'ok' && typeof slackParts === 'function') {
       const detail = slackParts(r).filter(Boolean).join(' · ');
       if (detail) line += ` — ${detail}`;
+      if (includeWeeklyStatus) {
+        const weekly = [
+          typeof r.day === 'number' && `day ${r.day}`,
+          r.lifecycle,
+          r.phase,
+          r.manualUploadReady ? 'manual upload: yes' : null,
+          r.warmupComplete ? 'warmup complete' : null,
+        ].filter(Boolean).join(' · ');
+        if (weekly) line += `${detail ? ' · ' : ' — '}${weekly}`;
+      }
     } else if (r.status === 'blocked') {
       line += ` — *reached but unusable: ${r.blockReason}*`;
     } else if (r.error) {
@@ -84,14 +99,22 @@ export async function sendUnclassifiedAlert(list) {
   );
 }
 
-// Graduation alert — account finished warmup (reached steady) and is ready for
-// manual upload. Fired ONCE per account (dedupe handled by graduation.js).
-export async function sendGraduationAlert(platform, list) {
+export async function sendWarmupCompleteAlert(platform, list) {
   if (!list.length) return;
   const mention = SLACK_MENTION_USER_ID ? `<@${SLACK_MENTION_USER_ID}> ` : '';
   const names = list.map(r => r.name).join(', ');
   await postSlack(
-    `:mortar_board: ${mention}${list.length} ${platform} account(s) finished warmup — `
-    + `now at steady, READY FOR MANUAL UPLOAD: ${names}`,
+    `:mortar_board: ${mention}${list.length} ${platform} account(s) completed the 30-day warmup `
+    + `and are now in maintenance: ${names}`,
+  );
+}
+
+export async function sendManualUploadReadyAlert(platform, list) {
+  if (!list.length) return;
+  const mention = SLACK_MENTION_USER_ID ? `<@${SLACK_MENTION_USER_ID}> ` : '';
+  const names = list.map(r => r.name).join(', ');
+  await postSlack(
+    `:rocket: ${mention}${list.length} ${platform} account(s) reached manual-upload day `
+    + `and can start manual content while warmup continues: ${names}`,
   );
 }

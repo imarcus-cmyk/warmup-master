@@ -34,10 +34,11 @@ export async function runAccount(account, def) {
 
   // Full-plan visibility (every platform): where this account sits in its ramp.
   const pos = `phase ${plan.phase} (${(plan.windowIndex ?? 0) + 1}/${plan.totalWindows})`;
-  const next = plan.graduated
-    ? 'FINAL — steady (warmup complete, ready for manual upload)'
+  const next = plan.warmupComplete
+    ? `maintenance active (${plan.lifecycle})`
     : `next: ${plan.nextPhase} in ~${plan.daysUntilNextPhase}d`;
-  console.log(`  >> plan: ${pos}; ${next}`);
+  console.log(`  >> plan: day ${plan.day}; ${pos}; ${next}`);
+  console.log(`  >> lifecycle: ${plan.lifecycle}; manual upload: ${plan.manualUploadReady ? 'yes' : 'no'}; warmup complete: ${plan.warmupComplete ? 'yes' : 'no'}`);
   if (Array.isArray(plan.rampPlan)) {
     console.log('  >> full ramp: ' + plan.rampPlan
       .map(w => `${w.current ? '▶' : ' '}${w.phase}≤${w.maxDay === Infinity ? '∞' : w.maxDay}d`)
@@ -48,9 +49,15 @@ export async function runAccount(account, def) {
     platform: def.label,
     name,
     profileId,
+    day: plan.day,
+    lifecycle: plan.lifecycle,
     mode: plan.mode,
     phase: plan.phase,
     graduated: !!plan.graduated,
+    warmupComplete: !!plan.warmupComplete,
+    manualUploadReady: !!plan.manualUploadReady,
+    warmupEndsDay: plan.warmupEndsDay,
+    manualUploadDay: plan.manualUploadDay || null,
     allowed,
     attempts: 0,
     status: 'failed',
@@ -66,12 +73,12 @@ export async function runAccount(account, def) {
     const page = session.page;
     result.attempts = session.attempts;
 
-    // Session time budget: randomized 5–10 min on platform, hard stop.
+    // Session time budget: randomized 4–8 min on platform, hard stop.
     const sessionMs = rand(SESSION_MIN_MS, SESSION_MAX_MS);
     const deadlineAt = Date.now() + sessionMs;
     plan._deadlineAt = deadlineAt; // helpers honor this inside their loops
     result.sessionBudgetSec = Math.round(sessionMs / 1000);
-    console.log(`  >> session budget ${result.sessionBudgetSec}s (5–10 min cap)`);
+    console.log(`  >> session budget ${result.sessionBudgetSec}s (4–8 min cap)`);
 
     // Non-technical health gate: profile opened, but is the account usable?
     const health = await checkHealth(page, def);

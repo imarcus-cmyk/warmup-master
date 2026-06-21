@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, open } from 'node:fs/promises';
 
 const DEFAULT_PLATFORMS = ['instagram', 'twitter', 'youtube', 'tiktok', 'reddit'];
 
@@ -29,11 +29,25 @@ function shuffled(values) {
   return out;
 }
 
+let transcript;
+
+function logLine(line) {
+  const text = `${line}\n`;
+  process.stdout.write(text);
+  if (transcript) transcript.write(text);
+}
+
+function errLine(line) {
+  const text = `${line}\n`;
+  process.stderr.write(text);
+  if (transcript) transcript.write(text);
+}
+
 function runOrchestrator(args, label) {
-  console.log(`\n[${new Date().toISOString()}] starting ${label}`);
+  logLine(`\n[${new Date().toISOString()}] starting ${label}`);
 
   if (process.env.WARMUP_DAILY_DRY_RUN) {
-    console.log(`[dry-run] node src/orchestrator.js ${args.join(' ')}`);
+    logLine(`[dry-run] node src/orchestrator.js ${args.join(' ')}`);
     return Promise.resolve(0);
   }
 
@@ -41,15 +55,26 @@ function runOrchestrator(args, label) {
     const child = spawn(process.execPath, ['src/orchestrator.js', ...args], {
       cwd: process.cwd(),
       env: process.env,
-      stdio: 'inherit',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    child.stdout.on('data', chunk => {
+      const text = chunk.toString();
+      process.stdout.write(text);
+      if (transcript) transcript.write(text);
+    });
+    child.stderr.on('data', chunk => {
+      const text = chunk.toString();
+      process.stderr.write(text);
+      if (transcript) transcript.write(text);
     });
 
     child.on('close', code => {
-      console.log(`[${new Date().toISOString()}] ${label} exited with code ${code}`);
+      logLine(`[${new Date().toISOString()}] ${label} exited with code ${code}`);
       resolve(code || 0);
     });
     child.on('error', err => {
-      console.error(`[${new Date().toISOString()}] ${label} failed to start: ${err.message}`);
+      errLine(`[${new Date().toISOString()}] ${label} failed to start: ${err.message}`);
       resolve(1);
     });
   });
@@ -58,6 +83,8 @@ function runOrchestrator(args, label) {
 const runPlatform = platform => runOrchestrator([platform], platform);
 
 await mkdir('logs', { recursive: true });
+const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+transcript = await open(`logs/daily-${stamp}.log`, 'a');
 
 const firstDelayMin = minutesEnv('WARMUP_DAILY_FIRST_DELAY_MIN', 3);
 const firstDelayMax = minutesEnv('WARMUP_DAILY_FIRST_DELAY_MAX', 15);
@@ -65,12 +92,12 @@ const gapMin = minutesEnv('WARMUP_DAILY_GAP_MIN', 8);
 const gapMax = minutesEnv('WARMUP_DAILY_GAP_MAX', 15);
 const order = shuffled(platformsFromEnv());
 
-console.log(`[${new Date().toISOString()}] daily warmup scheduler launched`);
-console.log(`platform order: ${order.join(' -> ')}`);
-console.log(`first delay: ${firstDelayMin}-${firstDelayMax}m; between-platform gap: ${gapMin}-${gapMax}m`);
+logLine(`[${new Date().toISOString()}] daily warmup scheduler launched`);
+logLine(`platform order: ${order.join(' -> ')}`);
+logLine(`first delay: ${firstDelayMin}-${firstDelayMax}m; between-platform gap: ${gapMin}-${gapMax}m`);
 
 const firstDelay = rand(firstDelayMin, firstDelayMax);
-console.log(`sleeping ${firstDelay}m before first platform`);
+logLine(`sleeping ${firstDelay}m before first platform`);
 await sleep(firstDelay * 60 * 1000);
 
 // Catch GoLogin profiles that match no platform before the cycle — they would
@@ -84,10 +111,11 @@ for (let i = 0; i < order.length; i++) {
 
   if (i < order.length - 1) {
     const gap = rand(gapMin, gapMax);
-    console.log(`sleeping ${gap}m before next platform`);
+    logLine(`sleeping ${gap}m before next platform`);
     await sleep(gap * 60 * 1000);
   }
 }
 
-console.log(`[${new Date().toISOString()}] daily warmup scheduler done; failures=${failures}`);
+logLine(`[${new Date().toISOString()}] daily warmup scheduler done; failures=${failures}`);
+await transcript.close();
 process.exit(failures ? 1 : 0);
