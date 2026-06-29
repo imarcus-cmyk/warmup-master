@@ -1,9 +1,12 @@
 // Shared Slack reporter. Per-platform detail lines come from the platform
 // definition's `slackParts(result)` so each platform reports its unique metrics.
+import { appendFile, mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const SLACK_REPORT_CHANNEL_ID = process.env.SLACK_REPORT_CHANNEL_ID || process.env.SLACK_CHANNEL_ID;
 const SLACK_MENTION_USER_ID = process.env.SLACK_MENTION_USER_ID;
+const SLACK_LOG_DIR = path.resolve('logs', 'slack');
 
 function isWeeklyStatusDay(date = new Date()) {
   return date.getUTCDay() === 0;
@@ -69,22 +72,65 @@ export async function sendSlackReport(results, { platform, slackParts, newProfil
   await postSlack(parts.join('\n'));
 }
 
+async function archiveSlackMessage(record) {
+  try {
+    await mkdir(SLACK_LOG_DIR, { recursive: true });
+    const stamp = record.generatedAt.replace(/[:.]/g, '-');
+    const channel = String(record.channel || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const file = path.join(SLACK_LOG_DIR, `${stamp}-${channel}.json`);
+    const dailyFile = path.join(SLACK_LOG_DIR, `${record.generatedAt.slice(0, 10)}.ndjson`);
+    const payload = JSON.stringify({ ...record, archiveFile: path.basename(file) }, null, 2);
+    await writeFile(file, payload);
+    await appendFile(dailyFile, JSON.stringify({ ...record, archiveFile: path.basename(file) }) + '\n');
+    return file;
+  } catch (err) {
+    console.error(`  >> slack archive failed: ${err.message}`);
+    return null;
+  }
+}
+
 // Low-level post. Logs to console when Slack isn't configured.
 export async function postSlack(text, { channel = SLACK_REPORT_CHANNEL_ID } = {}) {
+  const archiveRecord = {
+    generatedAt: new Date().toISOString(),
+    channel: channel || null,
+    text,
+    configured: Boolean(SLACK_BOT_TOKEN && channel),
+    delivery: 'pending',
+  };
+
   if (!SLACK_BOT_TOKEN || !channel) {
     console.log('  >> slack not configured; message below:\n' + text);
+    archiveRecord.delivery = 'not_configured';
+    await archiveSlackMessage(archiveRecord);
     return;
   }
-  const res = await fetch('https://slack.com/api/chat.postMessage', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      'Content-Type': 'application/json; charset=utf-8',
-    },
-    body: JSON.stringify({ channel, text, unfurl_links: false }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!data.ok) console.error(`  >> slack error: ${data.error || res.status}`);
+
+  try {
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ channel, text, unfurl_links: false }),
+    });
+    const data = await res.json().catch(() => ({}));
+    archiveRecord.delivery = data.ok ? 'sent' : 'slack_error';
+    archiveRecord.slack = {
+      ok: !!data.ok,
+      status: res.status,
+      error: data.error || null,
+      ts: data.ts || null,
+    };
+    if (!data.ok) console.error(`  >> slack error: ${data.error || res.status}`);
+  } catch (err) {
+    archiveRecord.delivery = 'request_failed';
+    archiveRecord.error = err.message;
+    throw err;
+  } finally {
+    await archiveSlackMessage(archiveRecord);
+  }
 }
 
 // Alert for GoLogin profiles that match no platform — they never warm.

@@ -35,6 +35,41 @@ async function appendAuditEntries({ platform, agent, generatedAt, results, logFi
   }));
 }
 
+export async function appendDailyProfileLog({ platform, agent, result, runStartedAt, attempt = 'primary' }) {
+  const generatedAt = new Date().toISOString();
+  const dir = path.resolve('logs', 'daily-profiles');
+  await mkdir(dir, { recursive: true });
+
+  const record = {
+    generatedAt,
+    runStartedAt,
+    date: generatedAt.slice(0, 10),
+    platform,
+    agent,
+    attempt,
+    profileId: result.profileId,
+    name: result.name,
+    status: result.status,
+    mode: result.mode || null,
+    phase: result.phase || null,
+    lifecycle: result.lifecycle || null,
+    day: typeof result.day === 'number' ? result.day : null,
+    graduated: !!result.graduated,
+    warmupComplete: !!result.warmupComplete,
+    manualUploadReady: !!result.manualUploadReady,
+    skipped: !!result.skipped,
+    requeued: !!result.requeued,
+    error: result.error || null,
+    blockReason: result.blockReason || null,
+    metrics: result.metrics || {},
+    events: result.events || [],
+  };
+
+  const dailyFile = path.join(dir, `${record.date}.ndjson`);
+  await appendFile(dailyFile, JSON.stringify(record) + '\n', 'utf8');
+  return dailyFile;
+}
+
 // Persist a structured run log to logs/<platform>-<timestamp>.json
 export async function writeRunLog({ platform, agent, results }) {
   const dir = path.resolve('logs');

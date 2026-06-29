@@ -22,7 +22,7 @@ import 'dotenv/config'; // MUST be first: loads .env before modules read process
 import { token, rand, sleep } from './core/util.js';
 import { discoverAccounts, findUnclassified } from './core/discover.js';
 import { runAccount } from './core/runAccount.js';
-import { writeRunLog } from './core/runLog.js';
+import { appendDailyProfileLog, writeRunLog } from './core/runLog.js';
 import { sendSlackReport, sendUnclassifiedAlert, sendWarmupCompleteAlert, sendManualUploadReadyAlert } from './core/slack.js';
 import { recordMilestones } from './core/graduation.js';
 
@@ -77,6 +77,8 @@ function validateRegistry() {
 // Run one platform subagent end-to-end
 // ---------------------------------------------------------------------------
 async function runPlatform(def) {
+  const runStartedAt = new Date().toISOString();
+  const agent = `${def.key}-warmup`;
   const deadline = Date.now() + def.deadlineMin * 60 * 1000;
 
   // Discover profiles live each run so new GoLogin profiles auto-join the cycle.
@@ -104,6 +106,16 @@ async function runPlatform(def) {
   const results = [];
   const failed = [];
 
+  async function saveProfileResult(result, attempt = 'primary') {
+    try {
+      const logPath = await appendDailyProfileLog({ platform: def.label, agent, result, runStartedAt, attempt });
+      console.log(`  >> daily profile log saved: ${logPath}`);
+    } catch (err) {
+      console.error(`daily profile log failed for ${result.name}: ${err.message}`);
+      throw err;
+    }
+  }
+
   // Shakedown: WARMUP_LIMIT caps accounts per platform (e.g. 1 for a test run).
   const limit = Number(process.env.WARMUP_LIMIT) || 0;
   const accounts = limit > 0 ? roster.slice(0, limit) : roster;
@@ -112,11 +124,14 @@ async function runPlatform(def) {
   for (const account of accounts) {
     if (Date.now() > deadline) {
       console.log(`\nglobal deadline reached — skipping ${account.name} and the rest`);
-      results.push({ platform: def.label, name: account.name, profileId: account.profileId, status: 'skipped', error: 'global time budget exceeded', skipped: true, events: [], metrics: {} });
+      const result = { platform: def.label, name: account.name, profileId: account.profileId, status: 'skipped', error: 'global time budget exceeded', skipped: true, events: [], metrics: {} };
+      results.push(result);
+      await saveProfileResult(result, 'skipped');
       continue;
     }
     const result = await runAccount(account, def);
     results.push(result);
+    await saveProfileResult(result);
     // Only RETRY technical failures. 'blocked' (suspended/login wall) won't be
     // fixed by retrying, so don't hammer it.
     if (result.status === 'failed') failed.push(account);
@@ -135,12 +150,13 @@ async function runPlatform(def) {
       retry.requeued = true;
       const idx = results.findIndex(r => r.profileId === account.profileId);
       if (idx !== -1) results[idx] = retry;
+      await saveProfileResult(retry, 'retry');
       await sleep(rand(20000, 35000));
     }
   }
 
   try {
-    const logPath = await writeRunLog({ platform: def.label, agent: `${def.key}-warmup`, results });
+    const logPath = await writeRunLog({ platform: def.label, agent, results });
     console.log(`  >> action log written: ${logPath}`);
   } catch (err) { console.error(`action log failed: ${err.message}`); }
 
