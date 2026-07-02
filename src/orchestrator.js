@@ -129,7 +129,7 @@ async function runPlatform(def) {
       await saveProfileResult(result, 'skipped');
       continue;
     }
-    const result = await runAccount(account, def);
+    const result = await runAccount(account, def, { agent, runStartedAt });
     results.push(result);
     await saveProfileResult(result);
     // Only RETRY technical failures. 'blocked' (suspended/login wall) won't be
@@ -146,7 +146,7 @@ async function runPlatform(def) {
     console.log(`\nretry pass for ${failed.length} ${def.label} account(s): ${failed.map(a => a.name).join(', ')}`);
     for (const account of failed) {
       if (Date.now() > deadline) { console.log(`deadline reached — skipping retry for ${account.name}`); continue; }
-      const retry = await runAccount(account, def);
+      const retry = await runAccount(account, def, { agent, runStartedAt });
       retry.requeued = true;
       const idx = results.findIndex(r => r.profileId === account.profileId);
       if (idx !== -1) results[idx] = retry;

@@ -70,6 +70,56 @@ export async function appendDailyProfileLog({ platform, agent, result, runStarte
   return dailyFile;
 }
 
+// Append an action-level journal entry before and after each profile action.
+// This is intentionally separate from the final JSON summary: if a browser,
+// server, or process dies mid-profile, we still have a durable trail of the
+// exact action that started and whatever details completed before the failure.
+export async function appendActionLog({
+  platform,
+  agent,
+  account,
+  action,
+  state,
+  runStartedAt,
+  plan = {},
+  metrics = {},
+  events = [],
+  error = null,
+}) {
+  const generatedAt = new Date().toISOString();
+  const dir = path.resolve('logs', 'actions');
+  await mkdir(dir, { recursive: true });
+
+  const record = {
+    generatedAt,
+    runStartedAt,
+    date: generatedAt.slice(0, 10),
+    platform,
+    agent,
+    profileId: account.profileId,
+    name: account.name,
+    action,
+    state,
+    mode: plan.mode || null,
+    phase: plan.phase || null,
+    lifecycle: plan.lifecycle || null,
+    day: typeof plan.day === 'number' ? plan.day : null,
+    metrics,
+    events,
+    error,
+  };
+
+  const dailyFile = path.join(dir, `${record.date}.ndjson`);
+  const safeId = String(account.profileId || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const profileFile = path.join(dir, `${safeId}.ndjson`);
+  const line = JSON.stringify(record) + '\n';
+  await Promise.all([
+    appendFile(dailyFile, line, 'utf8'),
+    appendFile(profileFile, line, 'utf8'),
+  ]);
+  return dailyFile;
+}
+
 // Persist a structured run log to logs/<platform>-<timestamp>.json
 export async function writeRunLog({ platform, agent, results }) {
   const dir = path.resolve('logs');

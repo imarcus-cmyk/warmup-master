@@ -17,7 +17,8 @@
     "task": "node src/agent/worker.js",
     "check:unclassified": "node src/orchestrator.js --check-unclassified",
     "validate": "node src/orchestrator.js --validate",
-    "deploy": "bash scripts/deploy.sh"
+    "deploy": "bash scripts/deploy.sh",
+    "logs:sync": "bash scripts/syncLogs.sh"
   },
   "dependencies": {
     "@slack/bolt": "^4.7.3",

@@ -106,6 +106,35 @@ async function loadRunLogs() {
   return logs.sort((a, b) => new Date(b.generatedAt) - new Date(a.generatedAt));
 }
 
+async function loadDailyProfileLogs() {
+  const dir = path.join(LOG_DIR, 'daily-profiles');
+  let files = [];
+  try {
+    files = await readdir(dir);
+  } catch {
+    return [];
+  }
+
+  const rows = [];
+  for (const file of files.filter(f => f.endsWith('.ndjson')).sort()) {
+    try {
+      const raw = await readFile(path.join(dir, file), 'utf8');
+      for (const line of raw.split('\n')) {
+        if (!line.trim()) continue;
+        const record = JSON.parse(line);
+        if (!record.profileId || !record.generatedAt) continue;
+        rows.push({
+          ...record,
+          logFile: `daily-profiles/${file}`,
+        });
+      }
+    } catch {
+      // Ignore malformed partial files; other log files can still answer.
+    }
+  }
+  return rows.sort((a, b) => new Date(b.generatedAt) - new Date(a.generatedAt));
+}
+
 function flattenResults(logs) {
   return logs.flatMap(log => (log.results || []).map(result => ({
     ...result,
@@ -113,6 +142,20 @@ function flattenResults(logs) {
     generatedAt: log.generatedAt,
     logFile: log.file,
   }))).sort((a, b) => new Date(b.generatedAt) - new Date(a.generatedAt));
+}
+
+function mergeResults(...groups) {
+  const byKey = new Map();
+  for (const result of groups.flat()) {
+    const key = [
+      result.profileId || norm(result.name),
+      norm(result.platform),
+      result.runStartedAt || result.date || String(result.generatedAt || '').slice(0, 10),
+      result.status || 'unknown',
+    ].join('|');
+    byKey.set(key, result);
+  }
+  return [...byKey.values()].sort((a, b) => new Date(b.generatedAt) - new Date(a.generatedAt));
 }
 
 function scoreAccount(text, account) {
@@ -351,7 +394,7 @@ export async function answerWarmupQuestion(text) {
   if (!clean || /\bhelp\b/i.test(clean)) return helpText();
 
   const logs = await loadRunLogs();
-  const results = flattenResults(logs);
+  const results = mergeResults(flattenResults(logs), await loadDailyProfileLogs());
   if (!results.length) return 'I do not see any warmup logs yet.';
 
   const count = countFromText(clean);

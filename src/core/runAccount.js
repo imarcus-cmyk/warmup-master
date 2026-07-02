@@ -9,6 +9,7 @@
 // is gated, so a platform only ever does what ITS plan unlocks for that age.
 import { connectWithRetry, stopProfile } from './gologin.js';
 import { checkHealth } from './health.js';
+import { appendActionLog } from './runLog.js';
 import { sleep, rand, shuffled, SESSION_MIN_MS, SESSION_MAX_MS } from './util.js';
 
 // Randomized gap between actions. Never the same twice — base jitter plus a
@@ -26,7 +27,7 @@ async function humanGap(page) {
   }
 }
 
-export async function runAccount(account, def) {
+export async function runAccount(account, def, { agent = `${def.key}-warmup`, runStartedAt = new Date().toISOString() } = {}) {
   const { profileId, name } = account;
   const plan = def.planFor(account);
   const allowed = plan.actions;
@@ -86,6 +87,17 @@ export async function runAccount(account, def) {
       result.status = 'blocked';
       result.blockReason = health.reason;
       result.events.push({ action: 'healthCheck', blocked: true, reason: health.reason, at: new Date().toISOString() });
+      await appendActionLog({
+        platform: def.label,
+        agent,
+        account,
+        action: 'healthCheck',
+        state: 'blocked',
+        runStartedAt,
+        plan,
+        error: health.reason,
+        events: [{ action: 'healthCheck', blocked: true, reason: health.reason, at: new Date().toISOString() }],
+      });
       console.error(`  >> ${name} BLOCKED (not technical): ${health.reason} — skipping actions`);
       return result; // finally still stops the profile
     }
@@ -101,25 +113,78 @@ export async function runAccount(account, def) {
     for (const actionName of sequence) {
       if (Date.now() > deadlineAt) {
         console.log(`  >> session time cap reached; stopping remaining actions for ${name}`);
-        result.events.push({ action: 'sessionCap', at: new Date().toISOString(), reachedAfterSec: result.sessionBudgetSec });
+        const event = { action: 'sessionCap', at: new Date().toISOString(), reachedAfterSec: result.sessionBudgetSec };
+        result.events.push(event);
+        await appendActionLog({
+          platform: def.label,
+          agent,
+          account,
+          action: actionName,
+          state: 'skipped-session-cap',
+          runStartedAt,
+          plan,
+          events: [event],
+        });
         break;
       }
       const fn = def.actions[actionName];
       if (!fn) {
         console.log(`  >> no helper for action '${actionName}' on ${def.label}; skipping`);
+        await appendActionLog({
+          platform: def.label,
+          agent,
+          account,
+          action: actionName,
+          state: 'skipped-missing-helper',
+          runStartedAt,
+          plan,
+          error: `no helper for action '${actionName}'`,
+        });
         continue;
       }
+      await appendActionLog({
+        platform: def.label,
+        agent,
+        account,
+        action: actionName,
+        state: 'started',
+        runStartedAt,
+        plan,
+      });
       try {
         const { events = [], ...counters } = await fn(page, plan, account);
         result.events.push(...events);
         for (const [k, v] of Object.entries(counters)) {
           result.metrics[k] = (result.metrics[k] || 0) + v;
         }
+        await appendActionLog({
+          platform: def.label,
+          agent,
+          account,
+          action: actionName,
+          state: 'completed',
+          runStartedAt,
+          plan,
+          metrics: counters,
+          events,
+        });
         // randomized human pause between action types — never a fixed gap
         await humanGap(page);
       } catch (err) {
         console.error(`  >> ${name} action '${actionName}' failed: ${err.message}`);
-        result.events.push({ action: actionName, error: err.message, at: new Date().toISOString() });
+        const event = { action: actionName, error: err.message, at: new Date().toISOString() };
+        result.events.push(event);
+        await appendActionLog({
+          platform: def.label,
+          agent,
+          account,
+          action: actionName,
+          state: 'failed',
+          runStartedAt,
+          plan,
+          events: [event],
+          error: err.message,
+        });
       }
     }
 
