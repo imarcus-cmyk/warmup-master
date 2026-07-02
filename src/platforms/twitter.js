@@ -5,14 +5,14 @@ import * as A from '../actions/twitterActions.js';
 
 const ramp = [
   { phase: 'days-1-7',   maxDay: 7,        targets: { notifications: 1, search: [1, 2], scrollFeed: [3, 5], watchVideos: [2, 3], viewProfiles: [0, 1], like: [0, 1], follow: 0,      bookmark: [0, 1] }, opts: { followBackMax: 2 } },
-  { phase: 'days-8-14',  maxDay: 14,       targets: { notifications: 1, search: [2, 3], scrollFeed: [5, 7], watchVideos: [3, 4], viewProfiles: [1, 2], like: [2, 3], follow: [2, 3], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
-  { phase: 'days-15-21', maxDay: 21,       targets: { notifications: 1, search: [2, 3], scrollFeed: [6, 8], watchVideos: [4, 5], viewProfiles: [2, 3], like: [3, 5], follow: [1, 2], bookmark: [1, 2] }, opts: { followBackMax: 3 } },
-  { phase: 'days-22-30', maxDay: 30,       targets: { notifications: 1, search: [3, 4], scrollFeed: [7, 9], watchVideos: [5, 6], viewProfiles: [2, 4], like: [4, 6], follow: [1, 2], bookmark: [1, 2] }, opts: { followBackMax: 3 } },
-  { phase: 'days-31-45', maxDay: 45,       targets: { notifications: 1, search: [2, 4], scrollFeed: [6, 9], watchVideos: [4, 6], viewProfiles: [1, 3], like: [3, 5], follow: [0, 2], bookmark: [1, 2] }, opts: { followBackMax: 3 } },
-  { phase: 'days-46-60', maxDay: 60,       targets: { notifications: 1, search: [2, 4], scrollFeed: [5, 8], watchVideos: [3, 5], viewProfiles: [1, 3], like: [2, 4], follow: [0, 1], bookmark: [1, 2] }, opts: { followBackMax: 2 } },
-  { phase: 'days-61-75', maxDay: 75,       targets: { notifications: 1, search: [1, 3], scrollFeed: [4, 7], watchVideos: [2, 4], viewProfiles: [1, 2], like: [1, 3], follow: [0, 1], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
-  { phase: 'days-76-90', maxDay: 90,       targets: { notifications: 1, search: [1, 2], scrollFeed: [3, 6], watchVideos: [2, 3], viewProfiles: [0, 2], like: [1, 2], follow: [0, 1], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
-  { phase: 'days-91+',   maxDay: Infinity, targets: { notifications: 1, search: [1, 2], scrollFeed: [3, 6], watchVideos: [2, 3], viewProfiles: [0, 2], like: [1, 2], follow: [0, 1], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
+  { phase: 'days-8-14',  maxDay: 14,       targets: { notifications: 1, search: [2, 3], scrollFeed: [5, 7], watchVideos: [3, 4], viewProfiles: [1, 2], like: [2, 3], commentLike: [2, 5], follow: [2, 3], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
+  { phase: 'days-15-21', maxDay: 21,       targets: { notifications: 1, search: [2, 3], scrollFeed: [6, 8], watchVideos: [4, 5], viewProfiles: [2, 3], like: [3, 5], commentLike: [2, 5], follow: [1, 2], bookmark: [1, 2] }, opts: { followBackMax: 3 } },
+  { phase: 'days-22-30', maxDay: 30,       targets: { notifications: 1, search: [3, 4], scrollFeed: [7, 9], watchVideos: [5, 6], viewProfiles: [2, 4], like: [4, 6], commentLike: [2, 5], follow: [1, 2], bookmark: [1, 2] }, opts: { followBackMax: 3 } },
+  { phase: 'days-31-45', maxDay: 45,       targets: { notifications: 1, search: [2, 4], scrollFeed: [6, 9], watchVideos: [4, 6], viewProfiles: [1, 3], like: [3, 5], commentLike: [2, 5], follow: [0, 2], bookmark: [1, 2] }, opts: { followBackMax: 3 } },
+  { phase: 'days-46-60', maxDay: 60,       targets: { notifications: 1, search: [2, 4], scrollFeed: [5, 8], watchVideos: [3, 5], viewProfiles: [1, 3], like: [2, 4], commentLike: [2, 5], follow: [0, 1], bookmark: [1, 2] }, opts: { followBackMax: 2 } },
+  { phase: 'days-61-75', maxDay: 75,       targets: { notifications: 1, search: [1, 3], scrollFeed: [4, 7], watchVideos: [2, 4], viewProfiles: [1, 2], like: [1, 3], commentLike: [2, 5], follow: [0, 1], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
+  { phase: 'days-76-90', maxDay: 90,       targets: { notifications: 1, search: [1, 2], scrollFeed: [3, 6], watchVideos: [2, 3], viewProfiles: [0, 2], like: [1, 2], commentLike: [2, 5], follow: [0, 1], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
+  { phase: 'days-91+',   maxDay: Infinity, targets: { notifications: 1, search: [1, 2], scrollFeed: [3, 6], watchVideos: [2, 3], viewProfiles: [0, 2], like: [1, 2], commentLike: [2, 5], follow: [0, 1], bookmark: [0, 1] }, opts: { followBackMax: 2 } },
 ];
 
 // Live GoLogin profiles (fetched 2026-06-14). wokeUpAt = createdAt.
@@ -57,6 +57,7 @@ export default {
       m.scrolls && `${m.scrolls} scroll`,
       m.watches && `${m.watches} watch`,
       m.likes && `${m.likes} like`,
+      m.commentLikes && `${m.commentLikes} comment-like`,
       m.follows && `${m.follows} follow`,
       m.followBacks && `${m.followBacks} followback`,
       m.bookmarks && `${m.bookmarks} bm`,

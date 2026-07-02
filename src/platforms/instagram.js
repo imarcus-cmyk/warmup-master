@@ -5,14 +5,14 @@ import * as A from '../actions/instagramActions.js';
 
 const ramp = [
   { phase: 'days-1-7',   maxDay: 7,        targets: { notifications: 1, scrollFeed: [4, 6],  watchReels: [4, 7],  exploreSearch: [0, 1], viewStories: [2, 4], like: [0, 2], follow: [0, 1] }, opts: { dwell: [10, 30], followBackMax: 1 } },
-  { phase: 'days-8-14',  maxDay: 14,       targets: { notifications: 1, scrollFeed: [6, 8],  watchReels: [6, 10], exploreSearch: [1, 2], viewStories: [4, 6], like: [2, 4], follow: [2, 4] }, opts: { dwell: [10, 40], followBackMax: 1 } },
-  { phase: 'days-15-21', maxDay: 21,       targets: { notifications: 1, scrollFeed: [7, 10], watchReels: [8, 12], exploreSearch: [2, 3], viewStories: [5, 7], like: [4, 6], follow: [1, 2] }, opts: { dwell: [10, 50], followBackMax: 1 } },
-  { phase: 'days-22-30', maxDay: 30,       targets: { notifications: 1, scrollFeed: [8, 12], watchReels: [10, 14], exploreSearch: [2, 4], viewStories: [6, 8], like: [5, 8], follow: [1, 3] }, opts: { dwell: [10, 60], followBackMax: 1 } },
-  { phase: 'days-31-45', maxDay: 45,       targets: { notifications: 1, scrollFeed: [6, 10], watchReels: [8, 12], exploreSearch: [1, 3], viewStories: [4, 7], like: [3, 6], follow: [0, 2] }, opts: { dwell: [10, 50], followBackMax: 1 } },
-  { phase: 'days-46-60', maxDay: 60,       targets: { notifications: 1, scrollFeed: [5, 8],  watchReels: [6, 10], exploreSearch: [1, 2], viewStories: [3, 6], like: [2, 5], follow: [0, 1] }, opts: { dwell: [10, 45], followBackMax: 1 } },
-  { phase: 'days-61-75', maxDay: 75,       targets: { notifications: 1, scrollFeed: [4, 7],  watchReels: [5, 8],  exploreSearch: [0, 2], viewStories: [2, 5], like: [1, 4], follow: [0, 1] }, opts: { dwell: [10, 40], followBackMax: 1 } },
-  { phase: 'days-76-90', maxDay: 90,       targets: { notifications: 1, scrollFeed: [3, 6],  watchReels: [4, 7],  exploreSearch: [0, 1], viewStories: [2, 4], like: [1, 3], follow: [0, 1] }, opts: { dwell: [10, 35], followBackMax: 1 } },
-  { phase: 'days-91+',   maxDay: Infinity, targets: { notifications: 1, scrollFeed: [3, 6],  watchReels: [4, 7],  exploreSearch: [0, 1], viewStories: [2, 4], like: [1, 3], follow: [0, 1] }, opts: { dwell: [10, 35], followBackMax: 1 } },
+  { phase: 'days-8-14',  maxDay: 14,       targets: { notifications: 1, scrollFeed: [6, 8],  watchReels: [6, 10], exploreSearch: [1, 2], viewStories: [4, 6], like: [2, 4], commentLike: [2, 5], follow: [2, 4] }, opts: { dwell: [10, 40], followBackMax: 1 } },
+  { phase: 'days-15-21', maxDay: 21,       targets: { notifications: 1, scrollFeed: [7, 10], watchReels: [8, 12], exploreSearch: [2, 3], viewStories: [5, 7], like: [4, 6], commentLike: [2, 5], follow: [1, 2] }, opts: { dwell: [10, 50], followBackMax: 1 } },
+  { phase: 'days-22-30', maxDay: 30,       targets: { notifications: 1, scrollFeed: [8, 12], watchReels: [10, 14], exploreSearch: [2, 4], viewStories: [6, 8], like: [5, 8], commentLike: [2, 5], follow: [1, 3] }, opts: { dwell: [10, 60], followBackMax: 1 } },
+  { phase: 'days-31-45', maxDay: 45,       targets: { notifications: 1, scrollFeed: [6, 10], watchReels: [8, 12], exploreSearch: [1, 3], viewStories: [4, 7], like: [3, 6], commentLike: [2, 5], follow: [0, 2] }, opts: { dwell: [10, 50], followBackMax: 1 } },
+  { phase: 'days-46-60', maxDay: 60,       targets: { notifications: 1, scrollFeed: [5, 8],  watchReels: [6, 10], exploreSearch: [1, 2], viewStories: [3, 6], like: [2, 5], commentLike: [2, 5], follow: [0, 1] }, opts: { dwell: [10, 45], followBackMax: 1 } },
+  { phase: 'days-61-75', maxDay: 75,       targets: { notifications: 1, scrollFeed: [4, 7],  watchReels: [5, 8],  exploreSearch: [0, 2], viewStories: [2, 5], like: [1, 4], commentLike: [2, 5], follow: [0, 1] }, opts: { dwell: [10, 40], followBackMax: 1 } },
+  { phase: 'days-76-90', maxDay: 90,       targets: { notifications: 1, scrollFeed: [3, 6],  watchReels: [4, 7],  exploreSearch: [0, 1], viewStories: [2, 4], like: [1, 3], commentLike: [2, 5], follow: [0, 1] }, opts: { dwell: [10, 35], followBackMax: 1 } },
+  { phase: 'days-91+',   maxDay: Infinity, targets: { notifications: 1, scrollFeed: [3, 6],  watchReels: [4, 7],  exploreSearch: [0, 1], viewStories: [2, 4], like: [1, 3], commentLike: [2, 5], follow: [0, 1] }, opts: { dwell: [10, 35], followBackMax: 1 } },
 ];
 
 export const accounts = [
@@ -56,6 +56,7 @@ export default {
       m.reels && `${m.reels} reels`,
       m.stories && `${m.stories} stories`,
       m.likes && `${m.likes} like`,
+      m.commentLikes && `${m.commentLikes} comment-like`,
       m.follows && `${m.follows} follow`,
       m.followBacks && `${m.followBacks} followback`,
     ];

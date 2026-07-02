@@ -126,6 +126,103 @@ export async function like(page, plan) {
   return { likes, events };
 }
 
+async function openVisibleInstagramComments(page) {
+  return page.evaluate(() => {
+    const articles = [...document.querySelectorAll('article')].filter(a => a.offsetParent !== null);
+    const article = articles.find(a => a.querySelector('svg[aria-label*="Comment" i], a[href*="/p/"], a[href*="/reel/"]')) || articles[0];
+    if (!article) return false;
+    const commentButton = [...article.querySelectorAll('button, div[role="button"], a, svg[aria-label*="Comment" i]')]
+      .map(el => el.closest('button, div[role="button"], a') || el)
+      .find(el => {
+        const label = el.getAttribute('aria-label') || el.querySelector?.('svg')?.getAttribute('aria-label') || '';
+        return el.offsetParent !== null && /comment/i.test(label);
+      });
+    if (commentButton) {
+      commentButton.scrollIntoView({ block: 'center' });
+      commentButton.click();
+      return true;
+    }
+    const postLink = [...article.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]')]
+      .find(a => a.offsetParent !== null);
+    if (!postLink) return false;
+    postLink.scrollIntoView({ block: 'center' });
+    postLink.click();
+    return true;
+  }).catch(() => false);
+}
+
+async function likeVisibleInstagramComment(page) {
+  return page.evaluate(() => {
+    const roots = [
+      ...document.querySelectorAll('div[role="dialog"] article ul li, div[role="dialog"] ul li, article ul li'),
+    ].filter(el => el.offsetParent !== null);
+    const rows = roots.length ? roots : [...document.querySelectorAll('div[role="dialog"] div, article div')]
+      .filter(el => el.offsetParent !== null && /\b(reply|likes?)\b/i.test(el.textContent || ''));
+
+    for (const row of rows) {
+      const button = [...row.querySelectorAll('button')]
+        .find(b => {
+          const label = b.getAttribute('aria-label') || b.querySelector('svg')?.getAttribute('aria-label') || '';
+          const pressed = b.getAttribute('aria-pressed');
+          return b.offsetParent !== null && /like/i.test(label) && !/unlike/i.test(label) && pressed !== 'true';
+        });
+      if (!button) continue;
+      button.scrollIntoView({ block: 'center' });
+      button.click();
+      return true;
+    }
+    return false;
+  }).catch(() => false);
+}
+
+export async function commentLike(page, plan) {
+  const events = []; let commentLikes = 0;
+  try { await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+  await dismiss(page);
+  for (let i = 0; i < plan.commentLike; i++) {
+    if (overtime(plan)) break;
+    await viewCurrentInstagramContentBeforeEngagement(page, plan);
+    let opened = false;
+    for (let s = 0; s < 8; s++) {
+      opened = await openVisibleInstagramComments(page);
+      if (opened) break;
+      await page.evaluate(() => window.scrollBy(0, 700)).catch(() => {});
+      await sleep(rand(1500, 3500));
+    }
+    if (!opened) {
+      events.push(makeEvent('commentLike', { skipped: 'comments control not found' }));
+      break;
+    }
+    await page.waitForLoadState('domcontentloaded', { timeout: 12000 }).catch(() => {});
+    await sleep(rand(5000, 10000));
+    let ok = false;
+    for (let s = 0; s < 8; s++) {
+      ok = await likeVisibleInstagramComment(page);
+      if (ok) break;
+      await page.evaluate(() => {
+        const dialog = document.querySelector('div[role="dialog"]');
+        const scrollTarget = dialog?.querySelector('ul') || dialog || document.scrollingElement;
+        scrollTarget.scrollBy?.(0, 350 + Math.random() * 350);
+      }).catch(() => {});
+      await sleep(rand(1500, 3500));
+    }
+    if (ok) {
+      commentLikes++;
+      events.push(makeEvent('commentLike', { fromCommentsPanel: true }));
+    } else {
+      events.push(makeEvent('commentLike', { skipped: 'comment heart not found' }));
+    }
+    await sleep(rand(4000, 9000));
+    await page.keyboard.press('Escape').catch(() => {});
+    await sleep(rand(1000, 2500));
+    try { await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+    await dismiss(page);
+    await page.evaluate(() => window.scrollBy(0, 750 + Math.random() * 650)).catch(() => {});
+    await sleep(rand(1500, 3500));
+  }
+  return { commentLikes, events };
+}
+
 // Open notifications/activity, then only follow back brand-new follower rows.
 // Instagram does not expose an exact timestamp in the DOM, so we use the visible
 // activity age: now/s/m/h/today/yesterday/1d/2d are treated as <= 48h; older

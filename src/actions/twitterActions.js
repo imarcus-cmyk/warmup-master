@@ -185,6 +185,80 @@ export async function like(page, plan) {
   return { likes, events };
 }
 
+async function openVisibleTweetPage(page) {
+  return page.evaluate(() => {
+    const articles = [...document.querySelectorAll('article')].filter(a => a.offsetParent !== null);
+    const article = articles.find(a => a.querySelector('a[href*="/status/"]')) || articles[0];
+    if (!article) return false;
+    const statusLink = [...article.querySelectorAll('a[href*="/status/"]')]
+      .find(a => !/\/photo\/|\/video\//i.test(a.getAttribute('href') || ''));
+    if (!statusLink) return false;
+    statusLink.scrollIntoView({ block: 'center' });
+    statusLink.click();
+    return true;
+  }).catch(() => false);
+}
+
+async function likeVisibleTwitterComment(page) {
+  return page.evaluate(() => {
+    const articles = [...document.querySelectorAll('article')].filter(a => a.offsetParent !== null);
+    for (const article of articles.slice(1)) {
+      const like = [...article.querySelectorAll('[data-testid="like"], [aria-label*="like" i]')]
+        .find(el => {
+          const text = `${el.textContent || ''} ${el.getAttribute('aria-label') || ''}`;
+          return el.offsetParent !== null && !/unlike|liked|remove/i.test(text);
+        });
+      if (!like) continue;
+      like.scrollIntoView({ block: 'center' });
+      like.click();
+      return true;
+    }
+    return false;
+  }).catch(() => false);
+}
+
+export async function commentLike(page, plan) {
+  const events = []; let commentLikes = 0;
+  try { await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+  await dismiss(page);
+  for (let i = 0; i < plan.commentLike; i++) {
+    if (overtime(plan)) break;
+    await readVisibleTweetBeforeEngagement(page, plan);
+    let opened = false;
+    for (let s = 0; s < 8; s++) {
+      opened = await openVisibleTweetPage(page);
+      if (opened) break;
+      await page.evaluate(() => window.scrollBy(0, 750)).catch(() => {});
+      await sleep(rand(1500, 3500));
+    }
+    if (!opened) {
+      events.push(makeEvent('commentLike', { skipped: 'no post link found' }));
+      break;
+    }
+    await page.waitForLoadState('domcontentloaded', { timeout: 12000 }).catch(() => {});
+    await sleep(rand(5000, 10000));
+    let ok = false;
+    for (let s = 0; s < 8; s++) {
+      ok = await likeVisibleTwitterComment(page);
+      if (ok) break;
+      await page.evaluate(() => window.scrollBy(0, 500 + Math.random() * 500)).catch(() => {});
+      await sleep(rand(1500, 3500));
+    }
+    if (ok) {
+      commentLikes++;
+      events.push(makeEvent('commentLike', { fromPostPage: true }));
+    } else {
+      events.push(makeEvent('commentLike', { skipped: 'comment like button not found' }));
+    }
+    await sleep(rand(4000, 9000));
+    try { await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+    await dismiss(page);
+    await page.evaluate(() => window.scrollBy(0, 800 + Math.random() * 700)).catch(() => {});
+    await sleep(rand(1500, 3500));
+  }
+  return { commentLikes, events };
+}
+
 // Watch videos in the timeline. X autoplays muted video on scroll, so we scroll
 // a video into view, let it play, dwell, then move past it. Used by both the
 // daily warmup (plan.watchVideos from the ramp) and one-off Slack tasks.
